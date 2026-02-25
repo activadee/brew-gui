@@ -34,8 +34,9 @@ Brew Sidebar becomes the safest and fastest desktop control plane for Homebrew: 
   - Right-side details sheet from Installed, Updates, and Browse overflow actions.
   - Hybrid details resolution (`brew info` + Homebrew API fallback) with partial warnings.
   - Version snapshot, homepage, license, dependencies, and caveats.
-- Add per-action progress log:
-  - Show running command, structured progress stages, exit status.
+- [x] Add per-action progress log (completed February 25, 2026):
+  - Structured activity drawer with grouped jobs, filters, and live stage updates.
+  - Full command preview, streamed output, exit code, and duration metadata.
 
 ## Phase 2: Advanced Homebrew Controls
 - Tap management:

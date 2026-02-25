@@ -6,8 +6,10 @@ import {
   type AppSettings,
   type AppSettingsUpdate,
   type BrewGuiBridge,
+  type BrewJobAction,
   type BrewJobCompleteEvent,
   type BrewJobFailedEvent,
+  type BrewJobKind,
   type BrewJobProgressEvent,
   type CheckNowResult,
   type InstallOneRequest,
@@ -25,6 +27,26 @@ import {
   type WindowChromeState,
   type WindowControlAction
 } from '../../../shared/contracts';
+
+function createFallbackJobCompleteEvent(options: {
+  action: BrewJobAction;
+  command: string;
+  kind: BrewJobKind;
+  packageName: string | null;
+}): BrewJobCompleteEvent {
+  return {
+    jobId: crypto.randomUUID(),
+    action: options.action,
+    command: options.command,
+    kind: options.kind,
+    packageName: options.packageName,
+    success: false,
+    exitCode: -1,
+    durationMs: 0,
+    output: 'Electron bridge unavailable',
+    timestamp: new Date().toISOString()
+  };
+}
 
 const createFallbackBridge = (): BrewGuiBridge => ({
   async openMainWindow() {
@@ -88,60 +110,64 @@ const createFallbackBridge = (): BrewGuiBridge => ({
     };
   },
   async installOne(_request: InstallOneRequest): Promise<BrewJobCompleteEvent> {
-    return {
-      jobId: crypto.randomUUID(),
-      success: false,
-      output: 'Electron bridge unavailable',
-      timestamp: new Date().toISOString()
-    };
+    return createFallbackJobCompleteEvent({
+      action: 'install',
+      command: `brew install --${_request.kind} ${_request.name}`,
+      kind: _request.kind,
+      packageName: _request.name
+    });
   },
   async reinstallOne(_request: ReinstallOneRequest): Promise<BrewJobCompleteEvent> {
-    return {
-      jobId: crypto.randomUUID(),
-      success: false,
-      output: 'Electron bridge unavailable',
-      timestamp: new Date().toISOString()
-    };
+    return createFallbackJobCompleteEvent({
+      action: 'reinstall',
+      command: _request.kind === 'cask' && _request.zap
+        ? `brew reinstall --cask --zap ${_request.name}`
+        : `brew reinstall --${_request.kind} ${_request.name}`,
+      kind: _request.kind,
+      packageName: _request.name
+    });
   },
   async uninstallOne(_request: UninstallOneRequest): Promise<BrewJobCompleteEvent> {
-    return {
-      jobId: crypto.randomUUID(),
-      success: false,
-      output: 'Electron bridge unavailable',
-      timestamp: new Date().toISOString()
-    };
+    return createFallbackJobCompleteEvent({
+      action: 'uninstall',
+      command: _request.kind === 'cask' && _request.zap
+        ? `brew uninstall --cask --zap ${_request.name}`
+        : `brew uninstall --${_request.kind} ${_request.name}`,
+      kind: _request.kind,
+      packageName: _request.name
+    });
   },
   async pinOne(_request: PinOneRequest): Promise<BrewJobCompleteEvent> {
-    return {
-      jobId: crypto.randomUUID(),
-      success: false,
-      output: 'Electron bridge unavailable',
-      timestamp: new Date().toISOString()
-    };
+    return createFallbackJobCompleteEvent({
+      action: 'pin',
+      command: `brew pin ${_request.name}`,
+      kind: 'formula',
+      packageName: _request.name
+    });
   },
   async unpinOne(_request: UnpinOneRequest): Promise<BrewJobCompleteEvent> {
-    return {
-      jobId: crypto.randomUUID(),
-      success: false,
-      output: 'Electron bridge unavailable',
-      timestamp: new Date().toISOString()
-    };
+    return createFallbackJobCompleteEvent({
+      action: 'unpin',
+      command: `brew unpin ${_request.name}`,
+      kind: 'formula',
+      packageName: _request.name
+    });
   },
   async upgradeOne(_request: UpgradeOneRequest): Promise<BrewJobCompleteEvent> {
-    return {
-      jobId: crypto.randomUUID(),
-      success: false,
-      output: 'Electron bridge unavailable',
-      timestamp: new Date().toISOString()
-    };
+    return createFallbackJobCompleteEvent({
+      action: 'upgradeOne',
+      command: `brew upgrade --${_request.kind} ${_request.name}`,
+      kind: _request.kind,
+      packageName: _request.name
+    });
   },
   async upgradeAll(): Promise<BrewJobCompleteEvent> {
-    return {
-      jobId: crypto.randomUUID(),
-      success: false,
-      output: 'Electron bridge unavailable',
-      timestamp: new Date().toISOString()
-    };
+    return createFallbackJobCompleteEvent({
+      action: 'upgradeAll',
+      command: 'brew upgrade --formula && brew upgrade --cask',
+      kind: 'system',
+      packageName: null
+    });
   },
   async checkNow(): Promise<CheckNowResult> {
     return {

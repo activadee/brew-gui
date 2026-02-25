@@ -249,6 +249,31 @@ export const updatesChangedEventSchema = z.object({
 });
 export type UpdatesChangedEvent = z.infer<typeof updatesChangedEventSchema>;
 
+export const brewJobActionSchema = z.union([
+  z.literal('install'),
+  z.literal('uninstall'),
+  z.literal('reinstall'),
+  z.literal('upgradeOne'),
+  z.literal('upgradeAll'),
+  z.literal('pin'),
+  z.literal('unpin'),
+  z.literal('syncMetadata')
+]);
+export type BrewJobAction = z.infer<typeof brewJobActionSchema>;
+
+export const brewJobKindSchema = z.union([
+  packageKindSchema,
+  z.literal('system')
+]);
+export type BrewJobKind = z.infer<typeof brewJobKindSchema>;
+
+export const brewJobStreamSchema = z.union([
+  z.literal('stdout'),
+  z.literal('stderr'),
+  z.literal('system')
+]);
+export type BrewJobStream = z.infer<typeof brewJobStreamSchema>;
+
 export const brewJobStageSchema = z.union([
   z.literal('queued'),
   z.literal('running'),
@@ -260,17 +285,26 @@ export type BrewJobStage = z.infer<typeof brewJobStageSchema>;
 
 export const brewJobProgressEventSchema = z.object({
   jobId: z.string(),
+  action: brewJobActionSchema,
+  command: z.string().min(1),
   stage: brewJobStageSchema,
+  stream: brewJobStreamSchema,
   message: z.string(),
   packageName: z.string().nullable(),
-  kind: packageKindSchema.nullable(),
+  kind: brewJobKindSchema,
   timestamp: z.string()
 });
 export type BrewJobProgressEvent = z.infer<typeof brewJobProgressEventSchema>;
 
 export const brewJobCompleteEventSchema = z.object({
   jobId: z.string(),
+  action: brewJobActionSchema,
+  command: z.string().min(1),
+  kind: brewJobKindSchema,
+  packageName: z.string().nullable(),
   success: z.boolean(),
+  exitCode: z.number().int(),
+  durationMs: z.number().int().nonnegative(),
   output: z.string(),
   timestamp: z.string()
 });
@@ -278,6 +312,12 @@ export type BrewJobCompleteEvent = z.infer<typeof brewJobCompleteEventSchema>;
 
 export const brewJobFailedEventSchema = z.object({
   jobId: z.string(),
+  action: brewJobActionSchema,
+  command: z.string().min(1),
+  kind: brewJobKindSchema,
+  packageName: z.string().nullable(),
+  exitCode: z.number().int(),
+  durationMs: z.number().int().nonnegative(),
   error: z.string(),
   output: z.string(),
   timestamp: z.string()

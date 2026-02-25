@@ -161,7 +161,13 @@ export function registerIpcHandlers(options: RegisterIpcOptions): void {
   });
 
   ipcMain.handle(IPC_CHANNELS.SYNC_METADATA, async () => {
-    const result = syncMetadataResultSchema.parse(await homebrew.syncMetadata());
+    const result = syncMetadataResultSchema.parse(
+      await homebrew.syncMetadata({
+        onProgress: emitJobProgress,
+        onComplete: emitJobComplete,
+        onFailed: emitJobFailed
+      })
+    );
     return result;
   });
 

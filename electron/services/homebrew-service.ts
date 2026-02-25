@@ -2,9 +2,12 @@ import { randomUUID } from 'node:crypto';
 
 import type {
   BrewAvailability,
+  BrewJobAction,
   BrewJobCompleteEvent,
   BrewJobFailedEvent,
+  BrewJobKind,
   BrewJobProgressEvent,
+  BrewJobStream,
   CatalogPackage,
   CheckNowResult,
   InstallOneRequest,
@@ -33,7 +36,7 @@ import {
   type BrewInfoResponse,
   type BrewOutdatedResponse
 } from './homebrew-normalizer';
-import { BrewRunner } from './brew-runner';
+import { BrewCommandError, BrewRunner } from './brew-runner';
 
 const CATALOG_TTL_MS = 24 * 60 * 60 * 1000;
 const DETAILS_TTL_MS = 10 * 60 * 1000;
@@ -48,6 +51,33 @@ interface CatalogMaterialized {
 interface PackageDetailsCacheEntry {
   details: PackageDetails;
   cachedAt: number;
+}
+
+interface TrackedJobTarget {
+  packageName: string | null;
+  kind: BrewJobKind;
+}
+
+interface TrackedJobOptions {
+  jobId: string;
+  commandText: string;
+  action: BrewJobAction;
+  command: string[];
+  target: TrackedJobTarget;
+  timeoutMs: number;
+  queuedMessage: string;
+  runningMessage: string;
+  sink: JobEventSink;
+  signal: AbortSignal;
+  allowAutoUpdate?: boolean;
+}
+
+type QueuedTrackedJobOptions = Omit<TrackedJobOptions, 'signal' | 'jobId' | 'commandText'>;
+
+interface StructuredBrewError {
+  message: string;
+  exitCode: number;
+  output: string;
 }
 
 export interface JobEventSink {
@@ -133,18 +163,39 @@ export class HomebrewService {
     };
   }
 
-  async syncMetadata(): Promise<SyncMetadataResult> {
+  async syncMetadata(sink?: JobEventSink): Promise<SyncMetadataResult> {
     log.info('Running explicit brew metadata sync');
 
-    const result = await this.runner.runText(['update'], {
+    if (!sink) {
+      const result = await this.runner.runText(['update'], {
+        allowAutoUpdate: true,
+        timeoutMs: 10 * 60 * 1000
+      });
+
+      return {
+        success: true,
+        output: `${result.stdout}${result.stderr}`.trim(),
+        syncedAt: new Date().toISOString()
+      };
+    }
+
+    const completion = await this.runQueuedTrackedJob({
+      action: 'syncMetadata',
+      command: ['update'],
+      target: { packageName: null, kind: 'system' },
+      timeoutMs: 10 * 60 * 1000,
+      queuedMessage: 'Queued Homebrew metadata sync',
+      runningMessage: 'Syncing Homebrew metadata',
       allowAutoUpdate: true,
-      timeoutMs: 10 * 60 * 1000
+      sink
     });
+
+    this.invalidateAllDetailsCache();
 
     return {
       success: true,
-      output: `${result.stdout}${result.stderr}`.trim(),
-      syncedAt: new Date().toISOString()
+      output: completion.output,
+      syncedAt: completion.timestamp
     };
   }
 
@@ -234,558 +285,480 @@ export class HomebrewService {
   }
 
   async upgradeOne(request: UpgradeOneRequest, sink: JobEventSink): Promise<BrewJobCompleteEvent> {
-    const jobId = randomUUID();
+    const command =
+      request.kind === 'formula'
+        ? ['upgrade', '--formula', request.name]
+        : ['upgrade', '--cask', request.name];
 
-    sink.onProgress({
-      jobId,
-      stage: 'queued',
-      message: `Queued upgrade for ${request.name}`,
-      packageName: request.name,
-      kind: request.kind,
-      timestamp: new Date().toISOString()
-    });
-
-    return this.mutationQueue.enqueue((signal) =>
-      this.runUpgradeJob(
-        jobId,
-        request.kind === 'formula'
-          ? ['upgrade', '--formula', request.name]
-          : ['upgrade', '--cask', request.name],
-        sink,
-        request.kind,
-        request.name,
-        signal
-      )
-    );
+    try {
+      return await this.runQueuedTrackedJob({
+        action: 'upgradeOne',
+        command,
+        target: {
+          packageName: request.name,
+          kind: request.kind
+        },
+        timeoutMs: 20 * 60 * 1000,
+        queuedMessage: `Queued upgrade for ${request.name}`,
+        runningMessage: `Upgrading ${request.name}`,
+        sink
+      });
+    } finally {
+      this.invalidateDetailsCacheEntry(request.kind, request.name);
+    }
   }
 
   async installOne(request: InstallOneRequest, sink: JobEventSink): Promise<BrewJobCompleteEvent> {
-    const jobId = randomUUID();
     const command = buildInstallCommand(request);
-    const installTimeoutMs = 20 * 60 * 1000;
-
-    sink.onProgress({
-      jobId,
-      stage: 'queued',
-      message: `Queued install for ${request.name}`,
-      packageName: request.name,
-      kind: request.kind,
-      timestamp: new Date().toISOString()
-    });
-
-    return this.mutationQueue.enqueue(async (signal) => {
-      sink.onProgress({
-        jobId,
-        stage: 'running',
-        message: `Installing ${request.name}`,
-        packageName: request.name,
-        kind: request.kind,
-        timestamp: new Date().toISOString()
+    try {
+      return await this.runQueuedTrackedJob({
+        action: 'install',
+        command,
+        target: {
+          packageName: request.name,
+          kind: request.kind
+        },
+        timeoutMs: 20 * 60 * 1000,
+        queuedMessage: `Queued install for ${request.name}`,
+        runningMessage: `Installing ${request.name}`,
+        sink
       });
-
-      try {
-        const result = await this.runner.runText(command, {
-          signal,
-          timeoutMs: installTimeoutMs,
-          onStdout: (chunk) =>
-            sink.onProgress({
-              jobId,
-              stage: 'output',
-              message: chunk,
-              packageName: request.name,
-              kind: request.kind,
-              timestamp: new Date().toISOString()
-            }),
-          onStderr: (chunk) =>
-            sink.onProgress({
-              jobId,
-              stage: 'output',
-              message: chunk,
-              packageName: request.name,
-              kind: request.kind,
-              timestamp: new Date().toISOString()
-            })
-        });
-
-        const event: BrewJobCompleteEvent = {
-          jobId,
-          success: true,
-          output: `${result.stdout}${result.stderr}`.trim(),
-          timestamp: new Date().toISOString()
-        };
-
-        sink.onComplete(event);
-        return event;
-      } catch (error) {
-        const failed: BrewJobFailedEvent = {
-          jobId,
-          error: (error as Error).message,
-          output: '',
-          timestamp: new Date().toISOString()
-        };
-
-        sink.onFailed(failed);
-        throw error;
-      } finally {
-        this.invalidateDetailsCacheEntry(request.kind, request.name);
-      }
-    }, installTimeoutMs);
+    } finally {
+      this.invalidateDetailsCacheEntry(request.kind, request.name);
+    }
   }
 
   async reinstallOne(request: ReinstallOneRequest, sink: JobEventSink): Promise<BrewJobCompleteEvent> {
-    const jobId = randomUUID();
     const command = buildReinstallCommand(request);
-    const reinstallTimeoutMs = 20 * 60 * 1000;
     const reinstallTarget =
       request.kind === 'cask' && request.zap ? `${request.name} (--zap)` : request.name;
 
-    sink.onProgress({
-      jobId,
-      stage: 'queued',
-      message: `Queued reinstall for ${reinstallTarget}`,
-      packageName: request.name,
-      kind: request.kind,
-      timestamp: new Date().toISOString()
-    });
-
-    return this.mutationQueue.enqueue(async (signal) => {
-      sink.onProgress({
-        jobId,
-        stage: 'running',
-        message: `Reinstalling ${reinstallTarget}`,
-        packageName: request.name,
-        kind: request.kind,
-        timestamp: new Date().toISOString()
+    try {
+      return await this.runQueuedTrackedJob({
+        action: 'reinstall',
+        command,
+        target: {
+          packageName: request.name,
+          kind: request.kind
+        },
+        timeoutMs: 20 * 60 * 1000,
+        queuedMessage: `Queued reinstall for ${reinstallTarget}`,
+        runningMessage: `Reinstalling ${reinstallTarget}`,
+        sink
       });
-
-      try {
-        const result = await this.runner.runText(command, {
-          signal,
-          timeoutMs: reinstallTimeoutMs,
-          onStdout: (chunk) =>
-            sink.onProgress({
-              jobId,
-              stage: 'output',
-              message: chunk,
-              packageName: request.name,
-              kind: request.kind,
-              timestamp: new Date().toISOString()
-            }),
-          onStderr: (chunk) =>
-            sink.onProgress({
-              jobId,
-              stage: 'output',
-              message: chunk,
-              packageName: request.name,
-              kind: request.kind,
-              timestamp: new Date().toISOString()
-            })
-        });
-
-        const event: BrewJobCompleteEvent = {
-          jobId,
-          success: true,
-          output: `${result.stdout}${result.stderr}`.trim(),
-          timestamp: new Date().toISOString()
-        };
-
-        sink.onComplete(event);
-        return event;
-      } catch (error) {
-        const failed: BrewJobFailedEvent = {
-          jobId,
-          error: (error as Error).message,
-          output: '',
-          timestamp: new Date().toISOString()
-        };
-
-        sink.onFailed(failed);
-        throw error;
-      } finally {
-        this.invalidateDetailsCacheEntry(request.kind, request.name);
-      }
-    }, reinstallTimeoutMs);
+    } finally {
+      this.invalidateDetailsCacheEntry(request.kind, request.name);
+    }
   }
 
   async uninstallOne(
     request: UninstallOneRequest,
     sink: JobEventSink
   ): Promise<BrewJobCompleteEvent> {
-    const jobId = randomUUID();
     const command = buildUninstallCommand(request);
-    const uninstallTimeoutMs = 20 * 60 * 1000;
     const uninstallTarget = request.kind === 'cask' && request.zap ? `${request.name} (--zap)` : request.name;
 
-    sink.onProgress({
-      jobId,
-      stage: 'queued',
-      message: `Queued uninstall for ${uninstallTarget}`,
-      packageName: request.name,
-      kind: request.kind,
-      timestamp: new Date().toISOString()
-    });
-
-    return this.mutationQueue.enqueue(async (signal) => {
-      sink.onProgress({
-        jobId,
-        stage: 'running',
-        message: `Uninstalling ${uninstallTarget}`,
-        packageName: request.name,
-        kind: request.kind,
-        timestamp: new Date().toISOString()
+    try {
+      return await this.runQueuedTrackedJob({
+        action: 'uninstall',
+        command,
+        target: {
+          packageName: request.name,
+          kind: request.kind
+        },
+        timeoutMs: 20 * 60 * 1000,
+        queuedMessage: `Queued uninstall for ${uninstallTarget}`,
+        runningMessage: `Uninstalling ${uninstallTarget}`,
+        sink
       });
-
-      try {
-        const result = await this.runner.runText(command, {
-          signal,
-          timeoutMs: uninstallTimeoutMs,
-          onStdout: (chunk) =>
-            sink.onProgress({
-              jobId,
-              stage: 'output',
-              message: chunk,
-              packageName: request.name,
-              kind: request.kind,
-              timestamp: new Date().toISOString()
-            }),
-          onStderr: (chunk) =>
-            sink.onProgress({
-              jobId,
-              stage: 'output',
-              message: chunk,
-              packageName: request.name,
-              kind: request.kind,
-              timestamp: new Date().toISOString()
-            })
-        });
-
-        const event: BrewJobCompleteEvent = {
-          jobId,
-          success: true,
-          output: `${result.stdout}${result.stderr}`.trim(),
-          timestamp: new Date().toISOString()
-        };
-
-        sink.onComplete(event);
-        return event;
-      } catch (error) {
-        const failed: BrewJobFailedEvent = {
-          jobId,
-          error: (error as Error).message,
-          output: '',
-          timestamp: new Date().toISOString()
-        };
-
-        sink.onFailed(failed);
-        throw error;
-      } finally {
-        this.invalidateDetailsCacheEntry(request.kind, request.name);
-      }
-    }, uninstallTimeoutMs);
+    } finally {
+      this.invalidateDetailsCacheEntry(request.kind, request.name);
+    }
   }
 
   async pinOne(request: PinOneRequest, sink: JobEventSink): Promise<BrewJobCompleteEvent> {
-    const jobId = randomUUID();
     const command = buildPinCommand(request);
-    const pinTimeoutMs = 5 * 60 * 1000;
-
-    sink.onProgress({
-      jobId,
-      stage: 'queued',
-      message: `Queued pin for ${request.name}`,
-      packageName: request.name,
-      kind: request.kind,
-      timestamp: new Date().toISOString()
-    });
-
-    return this.mutationQueue.enqueue(async (signal) => {
-      sink.onProgress({
-        jobId,
-        stage: 'running',
-        message: `Pinning ${request.name}`,
-        packageName: request.name,
-        kind: request.kind,
-        timestamp: new Date().toISOString()
+    try {
+      return await this.runQueuedTrackedJob({
+        action: 'pin',
+        command,
+        target: {
+          packageName: request.name,
+          kind: request.kind
+        },
+        timeoutMs: 5 * 60 * 1000,
+        queuedMessage: `Queued pin for ${request.name}`,
+        runningMessage: `Pinning ${request.name}`,
+        sink
       });
-
-      try {
-        const result = await this.runner.runText(command, {
-          signal,
-          timeoutMs: pinTimeoutMs,
-          onStdout: (chunk) =>
-            sink.onProgress({
-              jobId,
-              stage: 'output',
-              message: chunk,
-              packageName: request.name,
-              kind: request.kind,
-              timestamp: new Date().toISOString()
-            }),
-          onStderr: (chunk) =>
-            sink.onProgress({
-              jobId,
-              stage: 'output',
-              message: chunk,
-              packageName: request.name,
-              kind: request.kind,
-              timestamp: new Date().toISOString()
-            })
-        });
-
-        const event: BrewJobCompleteEvent = {
-          jobId,
-          success: true,
-          output: `${result.stdout}${result.stderr}`.trim(),
-          timestamp: new Date().toISOString()
-        };
-
-        sink.onComplete(event);
-        return event;
-      } catch (error) {
-        const failed: BrewJobFailedEvent = {
-          jobId,
-          error: (error as Error).message,
-          output: '',
-          timestamp: new Date().toISOString()
-        };
-
-        sink.onFailed(failed);
-        throw error;
-      } finally {
-        this.invalidateDetailsCacheEntry(request.kind, request.name);
-      }
-    }, pinTimeoutMs);
+    } finally {
+      this.invalidateDetailsCacheEntry(request.kind, request.name);
+    }
   }
 
   async unpinOne(request: UnpinOneRequest, sink: JobEventSink): Promise<BrewJobCompleteEvent> {
-    const jobId = randomUUID();
     const command = buildUnpinCommand(request);
-    const unpinTimeoutMs = 5 * 60 * 1000;
-
-    sink.onProgress({
-      jobId,
-      stage: 'queued',
-      message: `Queued unpin for ${request.name}`,
-      packageName: request.name,
-      kind: request.kind,
-      timestamp: new Date().toISOString()
-    });
-
-    return this.mutationQueue.enqueue(async (signal) => {
-      sink.onProgress({
-        jobId,
-        stage: 'running',
-        message: `Unpinning ${request.name}`,
-        packageName: request.name,
-        kind: request.kind,
-        timestamp: new Date().toISOString()
+    try {
+      return await this.runQueuedTrackedJob({
+        action: 'unpin',
+        command,
+        target: {
+          packageName: request.name,
+          kind: request.kind
+        },
+        timeoutMs: 5 * 60 * 1000,
+        queuedMessage: `Queued unpin for ${request.name}`,
+        runningMessage: `Unpinning ${request.name}`,
+        sink
       });
-
-      try {
-        const result = await this.runner.runText(command, {
-          signal,
-          timeoutMs: unpinTimeoutMs,
-          onStdout: (chunk) =>
-            sink.onProgress({
-              jobId,
-              stage: 'output',
-              message: chunk,
-              packageName: request.name,
-              kind: request.kind,
-              timestamp: new Date().toISOString()
-            }),
-          onStderr: (chunk) =>
-            sink.onProgress({
-              jobId,
-              stage: 'output',
-              message: chunk,
-              packageName: request.name,
-              kind: request.kind,
-              timestamp: new Date().toISOString()
-            })
-        });
-
-        const event: BrewJobCompleteEvent = {
-          jobId,
-          success: true,
-          output: `${result.stdout}${result.stderr}`.trim(),
-          timestamp: new Date().toISOString()
-        };
-
-        sink.onComplete(event);
-        return event;
-      } catch (error) {
-        const failed: BrewJobFailedEvent = {
-          jobId,
-          error: (error as Error).message,
-          output: '',
-          timestamp: new Date().toISOString()
-        };
-
-        sink.onFailed(failed);
-        throw error;
-      } finally {
-        this.invalidateDetailsCacheEntry(request.kind, request.name);
-      }
-    }, unpinTimeoutMs);
+    } finally {
+      this.invalidateDetailsCacheEntry(request.kind, request.name);
+    }
   }
 
   async upgradeAll(sink: JobEventSink): Promise<BrewJobCompleteEvent> {
     const jobId = randomUUID();
+    const action: BrewJobAction = 'upgradeAll';
+    const target: TrackedJobTarget = { packageName: null, kind: 'system' };
+    const commandText = 'brew upgrade --formula && brew upgrade --cask';
+    const startedAt = Date.now();
+    let combinedOutput = '';
 
-    sink.onProgress({
+    this.emitProgress({
+      sink,
       jobId,
+      action,
+      command: commandText,
       stage: 'queued',
-      message: 'Queued upgrade for all outdated packages',
-      packageName: null,
-      kind: null,
-      timestamp: new Date().toISOString()
+      stream: 'system',
+      target,
+      message: 'Queued upgrade for all outdated packages'
     });
 
-    return this.mutationQueue.enqueue(async (signal) => {
-      try {
-        sink.onProgress({
-          jobId,
-          stage: 'running',
-          message: 'Running formula upgrades',
-          packageName: null,
-          kind: null,
-          timestamp: new Date().toISOString()
-        });
+    return this.mutationQueue.enqueue(
+      async (signal) => {
+        try {
+          this.emitProgress({
+            sink,
+            jobId,
+            action,
+            command: commandText,
+            stage: 'running',
+            stream: 'system',
+            target,
+            message: 'Running formula upgrades'
+          });
 
-        const formulaOutput = await this.runner.runText(['upgrade', '--formula'], {
-          signal,
-          timeoutMs: 30 * 60 * 1000,
-          onStdout: (chunk) =>
-            sink.onProgress({
-              jobId,
-              stage: 'output',
-              message: chunk,
-              packageName: null,
-              kind: 'formula',
-              timestamp: new Date().toISOString()
-            }),
-          onStderr: (chunk) =>
-            sink.onProgress({
-              jobId,
-              stage: 'output',
-              message: chunk,
-              packageName: null,
-              kind: 'formula',
-              timestamp: new Date().toISOString()
-            })
-        });
+          const formulaResult = await this.runner.runText(['upgrade', '--formula'], {
+            signal,
+            timeoutMs: 30 * 60 * 1000,
+            onStdout: (chunk) => {
+              this.emitProgress({
+                sink,
+                jobId,
+                action,
+                command: commandText,
+                stage: 'output',
+                stream: 'stdout',
+                target: { packageName: null, kind: 'formula' },
+                message: chunk
+              });
+            },
+            onStderr: (chunk) => {
+              this.emitProgress({
+                sink,
+                jobId,
+                action,
+                command: commandText,
+                stage: 'output',
+                stream: 'stderr',
+                target: { packageName: null, kind: 'formula' },
+                message: chunk
+              });
+            }
+          });
+          combinedOutput += `${formulaResult.stdout}${formulaResult.stderr}`;
 
-        sink.onProgress({
-          jobId,
-          stage: 'running',
-          message: 'Running cask upgrades',
-          packageName: null,
-          kind: null,
-          timestamp: new Date().toISOString()
-        });
+          this.emitProgress({
+            sink,
+            jobId,
+            action,
+            command: commandText,
+            stage: 'running',
+            stream: 'system',
+            target,
+            message: 'Running cask upgrades'
+          });
 
-        const caskOutput = await this.runner.runText(['upgrade', '--cask'], {
-          signal,
-          timeoutMs: 30 * 60 * 1000,
-          onStdout: (chunk) =>
-            sink.onProgress({
-              jobId,
-              stage: 'output',
-              message: chunk,
-              packageName: null,
-              kind: 'cask',
-              timestamp: new Date().toISOString()
-            }),
-          onStderr: (chunk) =>
-            sink.onProgress({
-              jobId,
-              stage: 'output',
-              message: chunk,
-              packageName: null,
-              kind: 'cask',
-              timestamp: new Date().toISOString()
-            })
-        });
+          const caskResult = await this.runner.runText(['upgrade', '--cask'], {
+            signal,
+            timeoutMs: 30 * 60 * 1000,
+            onStdout: (chunk) => {
+              this.emitProgress({
+                sink,
+                jobId,
+                action,
+                command: commandText,
+                stage: 'output',
+                stream: 'stdout',
+                target: { packageName: null, kind: 'cask' },
+                message: chunk
+              });
+            },
+            onStderr: (chunk) => {
+              this.emitProgress({
+                sink,
+                jobId,
+                action,
+                command: commandText,
+                stage: 'output',
+                stream: 'stderr',
+                target: { packageName: null, kind: 'cask' },
+                message: chunk
+              });
+            }
+          });
+          combinedOutput += `${caskResult.stdout}${caskResult.stderr}`;
 
-        const event: BrewJobCompleteEvent = {
-          jobId,
-          success: true,
-          output: `${formulaOutput.stdout}\n${formulaOutput.stderr}\n${caskOutput.stdout}\n${caskOutput.stderr}`.trim(),
-          timestamp: new Date().toISOString()
-        };
-
-        sink.onComplete(event);
-        return event;
-      } finally {
-        this.invalidateAllDetailsCache();
-      }
-    });
+          const complete = this.buildCompleteEvent({
+            jobId,
+            action,
+            command: commandText,
+            target,
+            startedAt,
+            output: combinedOutput,
+            exitCode: 0
+          });
+          sink.onComplete(complete);
+          return complete;
+        } catch (error) {
+          const structured = this.extractStructuredError(error, commandText, combinedOutput);
+          const failed = this.buildFailedEvent({
+            jobId,
+            action,
+            command: commandText,
+            target,
+            startedAt,
+            error: structured.message,
+            output: structured.output,
+            exitCode: structured.exitCode
+          });
+          sink.onFailed(failed);
+          throw error;
+        } finally {
+          this.invalidateAllDetailsCache();
+        }
+      },
+      60 * 60 * 1000
+    );
   }
 
-  private async runUpgradeJob(
-    jobId: string,
-    command: string[],
-    sink: JobEventSink,
-    kind: 'formula' | 'cask',
-    packageName: string,
-    signal: AbortSignal
-  ): Promise<BrewJobCompleteEvent> {
-    sink.onProgress({
+  private runQueuedTrackedJob(options: QueuedTrackedJobOptions): Promise<BrewJobCompleteEvent> {
+    const jobId = randomUUID();
+    const commandText = `brew ${options.command.join(' ')}`;
+
+    this.emitProgress({
+      sink: options.sink,
       jobId,
+      action: options.action,
+      command: commandText,
+      stage: 'queued',
+      stream: 'system',
+      target: options.target,
+      message: options.queuedMessage
+    });
+
+    return this.mutationQueue.enqueue(
+      (signal) =>
+        this.executeTrackedJob({
+          ...options,
+          jobId,
+          commandText,
+          signal
+        }),
+      options.timeoutMs
+    );
+  }
+
+  private async executeTrackedJob(options: TrackedJobOptions): Promise<BrewJobCompleteEvent> {
+    const {
+      jobId,
+      commandText,
+      action,
+      command,
+      target,
+      timeoutMs,
+      runningMessage,
+      sink,
+      signal,
+      allowAutoUpdate = false
+    } = options;
+    const startedAt = Date.now();
+    let stdout = '';
+    let stderr = '';
+
+    this.emitProgress({
+      sink,
+      jobId,
+      action,
+      command: commandText,
       stage: 'running',
-      message: `Upgrading ${packageName}`,
-      packageName,
-      kind,
-      timestamp: new Date().toISOString()
+      stream: 'system',
+      target,
+      message: runningMessage
     });
 
     try {
       const result = await this.runner.runText(command, {
         signal,
-        timeoutMs: 20 * 60 * 1000,
-        onStdout: (chunk) =>
-          sink.onProgress({
+        timeoutMs,
+        allowAutoUpdate,
+        onStdout: (chunk) => {
+          stdout += chunk;
+          this.emitProgress({
+            sink,
             jobId,
+            action,
+            command: commandText,
             stage: 'output',
-            message: chunk,
-            packageName,
-            kind,
-            timestamp: new Date().toISOString()
-          }),
-        onStderr: (chunk) =>
-          sink.onProgress({
+            stream: 'stdout',
+            target,
+            message: chunk
+          });
+        },
+        onStderr: (chunk) => {
+          stderr += chunk;
+          this.emitProgress({
+            sink,
             jobId,
+            action,
+            command: commandText,
             stage: 'output',
-            message: chunk,
-            packageName,
-            kind,
-            timestamp: new Date().toISOString()
-          })
+            stream: 'stderr',
+            target,
+            message: chunk
+          });
+        }
       });
 
-      const event: BrewJobCompleteEvent = {
+      const complete = this.buildCompleteEvent({
         jobId,
-        success: true,
-        output: `${result.stdout}${result.stderr}`.trim(),
-        timestamp: new Date().toISOString()
-      };
-
-      sink.onComplete(event);
-      return event;
+        action,
+        command: commandText,
+        target,
+        startedAt,
+        output: `${result.stdout}${result.stderr}`,
+        exitCode: result.exitCode
+      });
+      sink.onComplete(complete);
+      return complete;
     } catch (error) {
-      const failed: BrewJobFailedEvent = {
+      const structured = this.extractStructuredError(error, commandText, `${stdout}${stderr}`);
+      const failed = this.buildFailedEvent({
         jobId,
-        error: (error as Error).message,
-        output: '',
-        timestamp: new Date().toISOString()
-      };
-
+        action,
+        command: commandText,
+        target,
+        startedAt,
+        error: structured.message,
+        output: structured.output,
+        exitCode: structured.exitCode
+      });
       sink.onFailed(failed);
       throw error;
-    } finally {
-      this.invalidateDetailsCacheEntry(kind, packageName);
     }
+  }
+
+  private emitProgress(options: {
+    sink: JobEventSink;
+    jobId: string;
+    action: BrewJobAction;
+    command: string;
+    stage: BrewJobProgressEvent['stage'];
+    stream: BrewJobStream;
+    target: TrackedJobTarget;
+    message: string;
+  }): void {
+    options.sink.onProgress({
+      jobId: options.jobId,
+      action: options.action,
+      command: options.command,
+      stage: options.stage,
+      stream: options.stream,
+      message: options.message,
+      packageName: options.target.packageName,
+      kind: options.target.kind,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  private buildCompleteEvent(options: {
+    jobId: string;
+    action: BrewJobAction;
+    command: string;
+    target: TrackedJobTarget;
+    startedAt: number;
+    output: string;
+    exitCode: number;
+  }): BrewJobCompleteEvent {
+    return {
+      jobId: options.jobId,
+      action: options.action,
+      command: options.command,
+      kind: options.target.kind,
+      packageName: options.target.packageName,
+      success: true,
+      exitCode: options.exitCode,
+      durationMs: Math.max(0, Date.now() - options.startedAt),
+      output: options.output.trim(),
+      timestamp: new Date().toISOString()
+    };
+  }
+
+  private buildFailedEvent(options: {
+    jobId: string;
+    action: BrewJobAction;
+    command: string;
+    target: TrackedJobTarget;
+    startedAt: number;
+    error: string;
+    output: string;
+    exitCode: number;
+  }): BrewJobFailedEvent {
+    return {
+      jobId: options.jobId,
+      action: options.action,
+      command: options.command,
+      kind: options.target.kind,
+      packageName: options.target.packageName,
+      exitCode: options.exitCode,
+      durationMs: Math.max(0, Date.now() - options.startedAt),
+      error: options.error,
+      output: options.output.trim(),
+      timestamp: new Date().toISOString()
+    };
+  }
+
+  private extractStructuredError(
+    error: unknown,
+    commandText: string,
+    fallbackOutput: string
+  ): StructuredBrewError {
+    if (error instanceof BrewCommandError) {
+      const output = `${error.stdout}${error.stderr}`.trim() || fallbackOutput.trim();
+      return {
+        message: error.message,
+        exitCode: error.exitCode,
+        output
+      };
+    }
+
+    const message = error instanceof Error ? error.message : `Command failed: ${commandText}`;
+    return {
+      message,
+      exitCode: -1,
+      output: fallbackOutput.trim()
+    };
   }
 
   private invalidateDetailsCacheEntry(

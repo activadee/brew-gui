@@ -328,7 +328,13 @@ function findButtonByText(root: HTMLElement, text: string): HTMLButtonElement | 
 function createJobCompleteEvent(success: boolean): BrewJobCompleteEvent {
   return {
     jobId: 'job-1',
+    action: 'uninstall',
+    command: 'brew uninstall --formula ripgrep',
+    kind: 'formula',
+    packageName: 'ripgrep',
     success,
+    exitCode: success ? 0 : 1,
+    durationMs: 120,
     output: success ? 'ok' : 'failed',
     timestamp: '2026-02-25T00:00:00.000Z'
   };

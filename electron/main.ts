@@ -80,9 +80,10 @@ function createMainWindow(): BrowserWindow {
     backgroundColor: '#ececef',
     autoHideMenuBar: true,
     skipTaskbar: false,
-    frame: !isDarwin,
+    frame: true,
     ...(isDarwin
       ? {
+	  	  titleBarStyle: 'hiddenInset' as const,
           vibrancy: 'sidebar' as const,
           visualEffectState: 'followWindow' as const
         }

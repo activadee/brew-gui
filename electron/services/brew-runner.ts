@@ -16,6 +16,29 @@ export interface BrewRunOptions {
   onStderr?: (text: string) => void;
 }
 
+export interface BrewCommandErrorOptions {
+  command: string[];
+  exitCode: number;
+  stdout: string;
+  stderr: string;
+}
+
+export class BrewCommandError extends Error {
+  readonly command: string[];
+  readonly exitCode: number;
+  readonly stdout: string;
+  readonly stderr: string;
+
+  constructor(message: string, options: BrewCommandErrorOptions) {
+    super(message);
+    this.name = 'BrewCommandError';
+    this.command = options.command;
+    this.exitCode = options.exitCode;
+    this.stdout = options.stdout;
+    this.stderr = options.stderr;
+  }
+}
+
 export class BrewRunner {
   private brewPath: string | null = null;
 
@@ -77,10 +100,12 @@ export class BrewRunner {
       onStdout,
       onStderr
     } = options;
+    const commandDisplay = `brew ${args.join(' ')}`;
 
     return new Promise<BrewCommandResult>((resolve, reject) => {
       let stdout = '';
       let stderr = '';
+      let settled = false;
 
       const child = spawn(this.brewPath as string, args, {
         env: {
@@ -90,14 +115,53 @@ export class BrewRunner {
         }
       });
 
+      const finalize = () => {
+        clearTimeout(timeout);
+        signal?.removeEventListener('abort', onAbort);
+      };
+
+      const rejectWith = (error: Error) => {
+        if (settled) {
+          return;
+        }
+
+        settled = true;
+        finalize();
+        reject(error);
+      };
+
+      const resolveWith = (result: BrewCommandResult) => {
+        if (settled) {
+          return;
+        }
+
+        settled = true;
+        finalize();
+        resolve(result);
+      };
+
       const timeout = setTimeout(() => {
         child.kill('SIGTERM');
-        reject(new Error(`brew ${args.join(' ')} timed out after ${timeoutMs}ms`));
+        rejectWith(
+          new BrewCommandError(`${commandDisplay} timed out after ${timeoutMs}ms`, {
+            command: args,
+            exitCode: -1,
+            stdout,
+            stderr
+          })
+        );
       }, timeoutMs);
 
       const onAbort = () => {
         child.kill('SIGTERM');
-        reject(new Error('brew command aborted'));
+        rejectWith(
+          new BrewCommandError(`${commandDisplay} aborted`, {
+            command: args,
+            exitCode: -1,
+            stdout,
+            stderr
+          })
+        );
       };
 
       if (signal) {
@@ -123,21 +187,37 @@ export class BrewRunner {
       });
 
       child.on('error', (error) => {
-        clearTimeout(timeout);
-        signal?.removeEventListener('abort', onAbort);
-        reject(error);
+        rejectWith(
+          new BrewCommandError(`${commandDisplay} failed: ${error.message}`, {
+            command: args,
+            exitCode: -1,
+            stdout,
+            stderr
+          })
+        );
       });
 
       child.on('close', (exitCode) => {
-        clearTimeout(timeout);
-        signal?.removeEventListener('abort', onAbort);
-
-        if (exitCode && exitCode !== 0) {
-          reject(new Error(stderr.trim() || `brew exited with code ${exitCode}`));
+        if (settled) {
           return;
         }
 
-        resolve({ stdout, stderr, exitCode: exitCode ?? 0 });
+        if (exitCode && exitCode !== 0) {
+          rejectWith(
+            new BrewCommandError(
+              stderr.trim() || `${commandDisplay} exited with code ${exitCode}`,
+              {
+                command: args,
+                exitCode,
+                stdout,
+                stderr
+              }
+            )
+          );
+          return;
+        }
+
+        resolveWith({ stdout, stderr, exitCode: exitCode ?? 0 });
       });
     });
   }

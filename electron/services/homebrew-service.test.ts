@@ -7,6 +7,7 @@ vi.mock('electron', () => ({
 }));
 
 import {
+  brewJobActionSchema,
   packageDetailsRequestSchema,
   reinstallOneRequestSchema,
   pinOneRequestSchema,
@@ -22,6 +23,7 @@ import {
   buildUnpinCommand,
   HomebrewService
 } from './homebrew-service';
+import { BrewCommandError } from './brew-runner';
 
 describe('buildInstallCommand', () => {
   it('builds formula install command', () => {
@@ -365,6 +367,75 @@ describe('HomebrewService.installOne', () => {
 
     expect(service.detailsCache.has('formula:ripgrep')).toBe(false);
   });
+
+  it('emits structured lifecycle events with action and command metadata', async () => {
+    const service = new HomebrewService() as any;
+    const runText = vi.fn(async () => ({ stdout: 'ok', stderr: '', exitCode: 0 }));
+    const enqueue = vi.fn(async (task: (signal: AbortSignal) => Promise<unknown>) =>
+      task(new AbortController().signal)
+    );
+
+    const onProgress = vi.fn();
+    const onComplete = vi.fn();
+    const onFailed = vi.fn();
+
+    service.runner = { runText };
+    service.mutationQueue = { enqueue };
+
+    const completion = await service.installOne(
+      { kind: 'formula', name: 'ripgrep' },
+      { onProgress, onComplete, onFailed }
+    );
+
+    expect(onProgress).toHaveBeenCalled();
+    const queued = onProgress.mock.calls.find((call) => call[0].stage === 'queued')?.[0];
+    const running = onProgress.mock.calls.find((call) => call[0].stage === 'running')?.[0];
+
+    expect(queued?.action).toBe('install');
+    expect(queued?.command).toBe('brew install --formula ripgrep');
+    expect(running?.stream).toBe('system');
+    expect(brewJobActionSchema.safeParse(completion.action).success).toBe(true);
+    expect(completion.command).toBe('brew install --formula ripgrep');
+    expect(completion.exitCode).toBe(0);
+    expect(completion.durationMs).toBeGreaterThanOrEqual(0);
+    expect(onFailed).not.toHaveBeenCalled();
+  });
+
+  it('emits failed events with structured exit code metadata', async () => {
+    const service = new HomebrewService() as any;
+    const runText = vi.fn(async () => {
+      throw new BrewCommandError('brew install failed', {
+        command: ['install', '--formula', 'ripgrep'],
+        exitCode: 1,
+        stdout: '',
+        stderr: 'Error: failed'
+      });
+    });
+    const enqueue = vi.fn(async (task: (signal: AbortSignal) => Promise<unknown>) =>
+      task(new AbortController().signal)
+    );
+
+    const onFailed = vi.fn();
+
+    service.runner = { runText };
+    service.mutationQueue = { enqueue };
+
+    await expect(
+      service.installOne(
+        { kind: 'formula', name: 'ripgrep' },
+        {
+          onProgress: () => undefined,
+          onComplete: () => undefined,
+          onFailed
+        }
+      )
+    ).rejects.toThrow();
+
+    expect(onFailed).toHaveBeenCalledTimes(1);
+    expect(onFailed.mock.calls[0]?.[0].action).toBe('install');
+    expect(onFailed.mock.calls[0]?.[0].exitCode).toBe(1);
+    expect(onFailed.mock.calls[0]?.[0].command).toBe('brew install --formula ripgrep');
+  });
 });
 
 describe('HomebrewService.uninstallOne', () => {
@@ -496,5 +567,59 @@ describe('HomebrewService.upgradeAll', () => {
     });
 
     expect(service.detailsCache.size).toBe(0);
+  });
+
+  it('emits upgrade-all lifecycle with structured action metadata', async () => {
+    const service = new HomebrewService() as any;
+    const runText = vi
+      .fn()
+      .mockResolvedValueOnce({ stdout: 'formula ok', stderr: '', exitCode: 0 })
+      .mockResolvedValueOnce({ stdout: 'cask ok', stderr: '', exitCode: 0 });
+    const enqueue = vi.fn(async (task: (signal: AbortSignal) => Promise<unknown>) =>
+      task(new AbortController().signal)
+    );
+    const onProgress = vi.fn();
+    const onComplete = vi.fn();
+
+    service.runner = { runText };
+    service.mutationQueue = { enqueue };
+
+    const result = await service.upgradeAll({
+      onProgress,
+      onComplete,
+      onFailed: () => undefined
+    });
+
+    expect(onProgress).toHaveBeenCalled();
+    expect(onProgress.mock.calls[0]?.[0].action).toBe('upgradeAll');
+    expect(result.action).toBe('upgradeAll');
+    expect(result.kind).toBe('system');
+    expect(result.command).toContain('brew upgrade');
+  });
+});
+
+describe('HomebrewService.syncMetadata', () => {
+  it('runs sync metadata on the mutation queue and emits structured job events', async () => {
+    const service = new HomebrewService() as any;
+    const runText = vi.fn(async () => ({ stdout: 'updated', stderr: '', exitCode: 0 }));
+    const enqueue = vi.fn(async (task: (signal: AbortSignal) => Promise<unknown>) =>
+      task(new AbortController().signal)
+    );
+    const onProgress = vi.fn();
+    const onComplete = vi.fn();
+
+    service.runner = { runText };
+    service.mutationQueue = { enqueue };
+
+    const result = await service.syncMetadata({
+      onProgress,
+      onComplete,
+      onFailed: () => undefined
+    });
+
+    expect(enqueue).toHaveBeenCalledTimes(1);
+    expect(onProgress.mock.calls[0]?.[0].action).toBe('syncMetadata');
+    expect(onComplete).toHaveBeenCalledTimes(1);
+    expect(result.success).toBe(true);
   });
 });

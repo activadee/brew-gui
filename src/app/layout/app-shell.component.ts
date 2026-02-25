@@ -328,7 +328,9 @@ export class AppShellComponent {
       }),
       this.facade.onJobFailed((event) => {
         this.jobsStore.markFailed(event);
-        this.toast.push(`Homebrew command failed: ${event.error}`, 'error', 6_000);
+        if (event.action !== 'syncMetadata') {
+          this.toast.push(`Homebrew command failed: ${event.error}`, 'error', 6_000);
+        }
       })
     ];
 

@@ -8,7 +8,6 @@ import type {
   UnpinOneRequest
 } from '../../../shared/contracts';
 import { BrewFacadeService } from '../services/brew-facade.service';
-import { JobsStore } from './jobs.store';
 
 type KindFilter = 'all' | PackageKind;
 type PinFilter = 'all' | 'pinned' | 'unpinned';
@@ -73,7 +72,7 @@ export const InstalledStore = signalStore(
       });
     })
   })),
-  withMethods((store, facade = inject(BrewFacadeService), jobsStore = inject(JobsStore)) => ({
+  withMethods((store, facade = inject(BrewFacadeService)) => ({
     setQuery(query: string): void {
       patchState(store, { query });
     },
@@ -110,12 +109,6 @@ export const InstalledStore = signalStore(
       try {
         const result = await facade.pinOne(payload);
         if (!result.success) {
-          jobsStore.markFailed({
-            jobId: result.jobId,
-            error: result.output || 'Pin command failed',
-            output: result.output,
-            timestamp: result.timestamp
-          });
           patchState(store, { error: result.output || 'Pin command failed' });
           return false;
         }
@@ -123,12 +116,6 @@ export const InstalledStore = signalStore(
         await this.refresh();
         return true;
       } catch (error) {
-        jobsStore.markFailed({
-          jobId: crypto.randomUUID(),
-          error: (error as Error).message,
-          output: '',
-          timestamp: new Date().toISOString()
-        });
         patchState(store, { error: (error as Error).message });
         return false;
       } finally {
@@ -142,12 +129,6 @@ export const InstalledStore = signalStore(
       try {
         const result = await facade.unpinOne(payload);
         if (!result.success) {
-          jobsStore.markFailed({
-            jobId: result.jobId,
-            error: result.output || 'Unpin command failed',
-            output: result.output,
-            timestamp: result.timestamp
-          });
           patchState(store, { error: result.output || 'Unpin command failed' });
           return false;
         }
@@ -155,12 +136,6 @@ export const InstalledStore = signalStore(
         await this.refresh();
         return true;
       } catch (error) {
-        jobsStore.markFailed({
-          jobId: crypto.randomUUID(),
-          error: (error as Error).message,
-          output: '',
-          timestamp: new Date().toISOString()
-        });
         patchState(store, { error: (error as Error).message });
         return false;
       } finally {

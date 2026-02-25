@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  brewJobCompleteEventSchema,
+  brewJobFailedEventSchema,
+  brewJobProgressEventSchema,
   packageDetailsRequestSchema,
   packageDetailsSchema,
   windowChromeStateSchema,
@@ -84,5 +87,68 @@ describe('window chrome contracts', () => {
   it('rejects invalid package detail requests', () => {
     const parsed = packageDetailsRequestSchema.safeParse({ kind: 'formula', name: '' });
     expect(parsed.success).toBe(false);
+  });
+
+  it('parses structured job progress payloads', () => {
+    const parsed = brewJobProgressEventSchema.parse({
+      jobId: 'job-1',
+      action: 'install',
+      command: 'brew install --formula ripgrep',
+      stage: 'output',
+      stream: 'stdout',
+      message: 'Downloading...',
+      packageName: 'ripgrep',
+      kind: 'formula',
+      timestamp: '2026-02-25T00:00:00.000Z'
+    });
+
+    expect(parsed.action).toBe('install');
+    expect(parsed.stream).toBe('stdout');
+  });
+
+  it('rejects job progress payloads without command metadata', () => {
+    const parsed = brewJobProgressEventSchema.safeParse({
+      jobId: 'job-1',
+      action: 'install',
+      stage: 'queued',
+      stream: 'system',
+      message: 'Queued',
+      packageName: 'ripgrep',
+      kind: 'formula',
+      timestamp: '2026-02-25T00:00:00.000Z'
+    });
+
+    expect(parsed.success).toBe(false);
+  });
+
+  it('parses structured complete/failed job payloads', () => {
+    const completed = brewJobCompleteEventSchema.parse({
+      jobId: 'job-1',
+      action: 'upgradeAll',
+      command: 'brew upgrade --formula && brew upgrade --cask',
+      kind: 'system',
+      packageName: null,
+      success: true,
+      exitCode: 0,
+      durationMs: 3_200,
+      output: 'done',
+      timestamp: '2026-02-25T00:00:03.200Z'
+    });
+
+    const failed = brewJobFailedEventSchema.parse({
+      jobId: 'job-2',
+      action: 'pin',
+      command: 'brew pin ripgrep',
+      kind: 'formula',
+      packageName: 'ripgrep',
+      exitCode: 1,
+      durationMs: 250,
+      error: 'already pinned',
+      output: 'Error: already pinned',
+      timestamp: '2026-02-25T00:00:00.250Z'
+    });
+
+    expect(completed.kind).toBe('system');
+    expect(failed.exitCode).toBe(1);
   });
 });

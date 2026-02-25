@@ -3,7 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { describe, expect, it, vi } from 'vitest';
 
-import type { WindowChromeState } from '../../shared/contracts';
+import type { BrewJobFailedEvent, WindowChromeState } from '../../shared/contracts';
 import { BrewFacadeService } from '../core/services/brew-facade.service';
 import { ToastService } from '../core/services/toast.service';
 import { AppStatusStore } from '../core/stores/app-status.store';
@@ -30,6 +30,7 @@ const chromeState: WindowChromeState = {
 
 describe('AppShellComponent titlebar', () => {
   async function render() {
+    let onJobFailedHandler: ((event: BrewJobFailedEvent) => void) | undefined;
     const appStatusStore = {
       availability: signal({
         available: true,
@@ -53,10 +54,23 @@ describe('AppShellComponent titlebar', () => {
 
     const jobsStore = {
       drawerOpen: signal(false),
-      latestEvents: signal<{ timestamp: string; message: string }[]>([]),
-      latestFailed: signal<{ error: string } | null>(null),
+      runningCount: signal(0),
+      succeededCount: signal(0),
+      failedCount: signal(0),
+      statusFilter: signal<'all' | 'running' | 'succeeded' | 'failed'>('all'),
+      actionFilter: signal<
+        'all' | 'install' | 'uninstall' | 'reinstall' | 'upgradeOne' | 'upgradeAll' | 'pin' | 'unpin' | 'syncMetadata'
+      >('all'),
+      kindFilter: signal<'all' | 'formula' | 'cask' | 'system'>('all'),
+      query: signal(''),
+      filteredJobs: signal([]),
       closeDrawer: vi.fn(),
+      openDrawer: vi.fn(),
       clearHistory: vi.fn(),
+      setStatusFilter: vi.fn(),
+      setActionFilter: vi.fn(),
+      setKindFilter: vi.fn(),
+      setQuery: vi.fn(),
       pushProgress: vi.fn(),
       markComplete: vi.fn(),
       markFailed: vi.fn()
@@ -72,7 +86,10 @@ describe('AppShellComponent titlebar', () => {
       onWindowChromeChanged: vi.fn(() => () => undefined),
       onJobProgress: vi.fn(() => () => undefined),
       onJobComplete: vi.fn(() => () => undefined),
-      onJobFailed: vi.fn(() => () => undefined)
+      onJobFailed: vi.fn((handler: (event: BrewJobFailedEvent) => void) => {
+        onJobFailedHandler = handler;
+        return () => undefined;
+      })
     };
 
     const toast = {
@@ -113,7 +130,7 @@ describe('AppShellComponent titlebar', () => {
     await fixture.whenStable();
     fixture.detectChanges();
 
-    return { fixture, facade };
+    return { fixture, facade, toast, onJobFailedHandler };
   }
 
   it('marks the titlebar as draggable and controls as non-draggable', async () => {
@@ -144,5 +161,26 @@ describe('AppShellComponent titlebar', () => {
       option.textContent?.includes('Check for updates now')
     );
     expect(paletteAction).toBeTruthy();
+  });
+
+  it('suppresses global toast for sync metadata job failures', async () => {
+    const { onJobFailedHandler, toast } = await render();
+    const toastPush = vi.mocked(toast.push);
+    const before = toastPush.mock.calls.length;
+
+    onJobFailedHandler?.({
+      jobId: 'job-1',
+      action: 'syncMetadata',
+      command: 'brew update',
+      kind: 'system',
+      packageName: null,
+      exitCode: 1,
+      durationMs: 200,
+      error: 'update failed',
+      output: 'Error: update failed',
+      timestamp: new Date().toISOString()
+    });
+
+    expect(toastPush.mock.calls.length).toBe(before);
   });
 });
