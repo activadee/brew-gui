@@ -306,12 +306,30 @@
     min-height: 0;
     overflow-y: auto;
     overflow-x: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .brew-sidebar-surface > aside > .flex-1 > z-sidebar-group {
+    flex: 1;
+    min-height: 0;
+  }
+
+  .brew-sidebar-surface > aside > .flex-1 > z-sidebar-group > div {
+    height: 100%;
+  }
+
+  .brew-nav-stack {
+    display: flex;
+    min-height: 100%;
+    flex-direction: column;
   }
 
   .brew-nav-link {
-    justify-content: space-between;
+    justify-content: flex-start !important;
     width: 100%;
     height: 32px;
+    padding: 0 10px !important;
     border-radius: 8px;
     font-size: 13px;
     font-weight: 500;
@@ -320,6 +338,25 @@
       background-color 150ms ease,
       color 150ms ease,
       border-color 150ms ease;
+  }
+
+  .brew-nav-leading {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .brew-nav-icon {
+    color: color-mix(in oklab, var(--sidebar-foreground) 68%, transparent);
+  }
+
+  .brew-nav-link > z-badge {
+    margin-left: auto;
+  }
+
+  .brew-nav-bottom {
+    margin-top: auto;
   }
 
   .brew-nav-link:hover {
