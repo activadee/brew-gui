@@ -20,7 +20,7 @@ export interface PackageRowOverflowAction {
     ZardIconComponent
   ],
   templateUrl: './package-row-overflow-menu.component.html',
-  changeDetection: ChangeDetectionStrategy.OnPush
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './package-row-overflow-menu.component.css',
 })
 export class PackageRowOverflowMenuComponent {

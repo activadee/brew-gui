@@ -19,7 +19,7 @@ import { JobsStore, type JobActionFilter, type JobKindFilter, type JobStatusFilt
     PackageSearchInputComponent
   ],
   templateUrl: './command-progress-drawer.component.html',
-  changeDetection: ChangeDetectionStrategy.OnPush
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './command-progress-drawer.component.css',
 })
 export class CommandProgressDrawerComponent {

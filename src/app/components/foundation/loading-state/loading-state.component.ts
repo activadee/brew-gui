@@ -7,7 +7,7 @@ import { ZardLoaderComponent } from '@/shared/components/loader';
   selector: 'app-loading-state',
   imports: [ZardCardComponent, ZardLoaderComponent],
   templateUrl: './loading-state.component.html',
-  changeDetection: ChangeDetectionStrategy.OnPush
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './loading-state.component.css',
 })
 export class LoadingStateComponent {

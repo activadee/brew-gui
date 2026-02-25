@@ -11,7 +11,7 @@ import type { PackageKind } from '../../../../shared/contracts';
   selector: 'app-reinstall-confirm-dialog',
   imports: [FormsModule, ZardCardComponent, ZardButtonComponent, ZardCheckboxComponent, ZardDividerComponent],
   templateUrl: './reinstall-confirm-dialog.component.html',
-  changeDetection: ChangeDetectionStrategy.OnPush
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './reinstall-confirm-dialog.component.css',
 })
 export class ReinstallConfirmDialogComponent {

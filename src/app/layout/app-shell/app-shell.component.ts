@@ -39,6 +39,7 @@ const ROUTE_LABELS: Record<string, string> = {
   '/updates': 'Updates',
   '/installed': 'Installed',
   '/browse': 'Browse',
+  '/cleanup': 'Cleanup',
   '/taps': 'Taps',
   '/settings': 'Settings',
   '/tray': 'Tray'
@@ -64,7 +65,7 @@ const ROUTE_LABELS: Record<string, string> = {
     ToastHostComponent
   ],
   templateUrl: './app-shell.component.html',
-  changeDetection: ChangeDetectionStrategy.OnPush
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './app-shell.component.css',
 })
 export class AppShellComponent {

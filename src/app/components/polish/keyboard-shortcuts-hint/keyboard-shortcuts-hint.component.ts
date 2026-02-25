@@ -6,7 +6,7 @@ import { ZardKbdComponent, ZardKbdGroupComponent } from '@/shared/components/kbd
   selector: 'app-keyboard-shortcuts-hint',
   imports: [ZardKbdGroupComponent, ZardKbdComponent],
   templateUrl: './keyboard-shortcuts-hint.component.html',
-  changeDetection: ChangeDetectionStrategy.OnPush
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './keyboard-shortcuts-hint.component.css',
 })
 export class KeyboardShortcutsHintComponent {}

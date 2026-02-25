@@ -7,7 +7,7 @@ import { ZardIconComponent } from '@/shared/components/icon';
   selector: 'app-connection-status-pill',
   imports: [ZardBadgeComponent, ZardIconComponent],
   templateUrl: './connection-status-pill.component.html',
-  changeDetection: ChangeDetectionStrategy.OnPush
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './connection-status-pill.component.css',
 })
 export class ConnectionStatusPillComponent {

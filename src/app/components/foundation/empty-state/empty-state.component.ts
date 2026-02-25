@@ -6,7 +6,7 @@ import { ZardEmptyComponent } from '@/shared/components/empty';
   selector: 'app-empty-state',
   imports: [ZardEmptyComponent],
   templateUrl: './empty-state.component.html',
-  changeDetection: ChangeDetectionStrategy.OnPush
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './empty-state.component.css',
 })
 export class EmptyStateComponent {

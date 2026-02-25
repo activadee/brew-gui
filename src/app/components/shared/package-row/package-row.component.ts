@@ -18,7 +18,7 @@ import {
     PackageRowOverflowMenuComponent
   ],
   templateUrl: './package-row.component.html',
-  changeDetection: ChangeDetectionStrategy.OnPush
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './package-row.component.css',
 })
 export class PackageRowComponent {

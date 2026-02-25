@@ -33,7 +33,7 @@ import { UpdatesStore } from '../../../core/stores/updates.store';
     PackageSearchInputComponent
   ],
   templateUrl: './taps-view.component.html',
-  changeDetection: ChangeDetectionStrategy.OnPush
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './taps-view.component.css',
 })
 export class TapsViewComponent {

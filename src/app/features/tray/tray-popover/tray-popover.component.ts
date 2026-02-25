@@ -13,7 +13,7 @@ import { UpdatesStore } from '../../../core/stores/updates.store';
   selector: 'app-tray-popover',
   imports: [FormsModule, ZardCardComponent, ZardBadgeComponent, ZardButtonComponent, ZardSegmentedComponent],
   templateUrl: './tray-popover.component.html',
-  changeDetection: ChangeDetectionStrategy.OnPush
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './tray-popover.component.css',
 })
 export class TrayPopoverComponent {

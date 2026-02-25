@@ -7,7 +7,7 @@ import { ZardInputDirective } from '@/shared/components/input';
   selector: 'app-package-search-input',
   imports: [ZardIconComponent, ZardInputDirective],
   templateUrl: './package-search-input.component.html',
-  changeDetection: ChangeDetectionStrategy.OnPush
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './package-search-input.component.css',
 })
 export class PackageSearchInputComponent {

@@ -8,7 +8,7 @@ import { ZardCardComponent } from '@/shared/components/card';
   selector: 'app-brew-missing-view',
   imports: [ZardCardComponent, ZardBadgeComponent, ZardButtonComponent],
   templateUrl: './brew-missing-view.component.html',
-  changeDetection: ChangeDetectionStrategy.OnPush
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './brew-missing-view.component.css',
 })
 export class BrewMissingViewComponent {}

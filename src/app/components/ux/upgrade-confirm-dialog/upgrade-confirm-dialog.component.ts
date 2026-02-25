@@ -8,7 +8,7 @@ import { ZardDividerComponent } from '@/shared/components/divider';
   selector: 'app-upgrade-confirm-dialog',
   imports: [ZardCardComponent, ZardButtonComponent, ZardDividerComponent],
   templateUrl: './upgrade-confirm-dialog.component.html',
-  changeDetection: ChangeDetectionStrategy.OnPush
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './upgrade-confirm-dialog.component.css',
 })
 export class UpgradeConfirmDialogComponent {

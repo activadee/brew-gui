@@ -13,7 +13,7 @@ export interface PackageFilterOption {
   selector: 'app-package-filter-chips',
   imports: [FormsModule, ZardSegmentedComponent],
   templateUrl: './package-filter-chips.component.html',
-  changeDetection: ChangeDetectionStrategy.OnPush
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './package-filter-chips.component.css',
 })
 export class PackageFilterChipsComponent {

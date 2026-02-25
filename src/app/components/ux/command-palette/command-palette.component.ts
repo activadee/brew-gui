@@ -27,7 +27,7 @@ export interface CommandPaletteAction {
     ZardCommandOptionComponent
   ],
   templateUrl: './command-palette.component.html',
-  changeDetection: ChangeDetectionStrategy.OnPush
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './command-palette.component.css',
 })
 export class CommandPaletteComponent {

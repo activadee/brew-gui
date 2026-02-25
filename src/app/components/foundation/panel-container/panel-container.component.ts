@@ -6,7 +6,7 @@ import { ZardCardComponent } from '@/shared/components/card';
   selector: 'app-panel-container',
   imports: [ZardCardComponent],
   templateUrl: './panel-container.component.html',
-  changeDetection: ChangeDetectionStrategy.OnPush
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './panel-container.component.css',
 })
 export class PanelContainerComponent {}

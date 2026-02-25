@@ -21,7 +21,7 @@ import { SettingsStore } from '../../../core/stores/settings.store';
     ZardSwitchComponent
   ],
   templateUrl: './settings-view.component.html',
-  changeDetection: ChangeDetectionStrategy.OnPush
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './settings-view.component.css',
 })
 export class SettingsViewComponent {

@@ -6,7 +6,7 @@ import { ZardButtonComponent } from '@/shared/components/button';
   selector: 'app-package-action-button',
   imports: [ZardButtonComponent],
   templateUrl: './package-action-button.component.html',
-  changeDetection: ChangeDetectionStrategy.OnPush
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './package-action-button.component.css',
 })
 export class PackageActionButtonComponent {

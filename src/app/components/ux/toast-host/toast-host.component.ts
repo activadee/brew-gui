@@ -9,7 +9,7 @@ import { ToastService } from '../../../core/services/toast.service';
   selector: 'app-toast-host',
   imports: [ZardCardComponent, ZardBadgeComponent, ZardButtonComponent],
   templateUrl: './toast-host.component.html',
-  changeDetection: ChangeDetectionStrategy.OnPush
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './toast-host.component.css',
 })
 export class ToastHostComponent {

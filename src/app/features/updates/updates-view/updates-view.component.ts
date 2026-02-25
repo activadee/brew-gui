@@ -28,7 +28,7 @@ import { UpdatesStore } from '../../../core/stores/updates.store';
     UpgradeConfirmDialogComponent
   ],
   templateUrl: './updates-view.component.html',
-  changeDetection: ChangeDetectionStrategy.OnPush
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './updates-view.component.css',
 })
 export class UpdatesViewComponent {

@@ -18,7 +18,7 @@ import { PackageDetailsStore } from '../../../core/stores/package-details.store'
     ZardSkeletonComponent
   ],
   templateUrl: './package-details-drawer.component.html',
-  changeDetection: ChangeDetectionStrategy.OnPush
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './package-details-drawer.component.css',
 })
 export class PackageDetailsDrawerComponent {

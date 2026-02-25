@@ -7,7 +7,7 @@ import type { PackageKind } from '../../../../shared/contracts';
   selector: 'app-package-meta',
   imports: [ZardBadgeComponent],
   templateUrl: './package-meta.component.html',
-  changeDetection: ChangeDetectionStrategy.OnPush
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './package-meta.component.css',
 })
 export class PackageMetaComponent {

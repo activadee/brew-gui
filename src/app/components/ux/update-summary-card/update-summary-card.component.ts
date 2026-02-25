@@ -7,7 +7,7 @@ import { ZardCardComponent } from '@/shared/components/card';
   selector: 'app-update-summary-card',
   imports: [ZardCardComponent, ZardBadgeComponent],
   templateUrl: './update-summary-card.component.html',
-  changeDetection: ChangeDetectionStrategy.OnPush
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './update-summary-card.component.css',
 })
 export class UpdateSummaryCardComponent {

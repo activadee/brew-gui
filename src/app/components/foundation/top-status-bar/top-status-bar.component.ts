@@ -8,7 +8,7 @@ import { ConnectionStatusPillComponent } from '../../polish/connection-status-pi
   selector: 'app-top-status-bar',
   imports: [ZardCardComponent, ZardBadgeComponent, ConnectionStatusPillComponent],
   templateUrl: './top-status-bar.component.html',
-  changeDetection: ChangeDetectionStrategy.OnPush
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './top-status-bar.component.css',
 })
 export class TopStatusBarComponent {

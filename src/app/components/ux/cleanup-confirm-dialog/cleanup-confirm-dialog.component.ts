@@ -8,7 +8,7 @@ import { ZardDividerComponent } from '@/shared/components/divider';
   selector: 'app-cleanup-confirm-dialog',
   imports: [ZardCardComponent, ZardButtonComponent, ZardDividerComponent],
   templateUrl: './cleanup-confirm-dialog.component.html',
-  changeDetection: ChangeDetectionStrategy.OnPush
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './cleanup-confirm-dialog.component.css',
 })
 export class CleanupConfirmDialogComponent {

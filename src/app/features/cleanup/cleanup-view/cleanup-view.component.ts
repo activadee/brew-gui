@@ -20,7 +20,7 @@ import { CleanupStore } from '../../../core/stores/cleanup.store';
     CleanupConfirmDialogComponent
   ],
   templateUrl: './cleanup-view.component.html',
-  changeDetection: ChangeDetectionStrategy.OnPush
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './cleanup-view.component.css',
 })
 export class CleanupViewComponent {

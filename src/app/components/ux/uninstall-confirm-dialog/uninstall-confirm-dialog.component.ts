@@ -11,7 +11,7 @@ import type { PackageKind } from '../../../../shared/contracts';
   selector: 'app-uninstall-confirm-dialog',
   imports: [FormsModule, ZardCardComponent, ZardButtonComponent, ZardCheckboxComponent, ZardDividerComponent],
   templateUrl: './uninstall-confirm-dialog.component.html',
-  changeDetection: ChangeDetectionStrategy.OnPush
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './uninstall-confirm-dialog.component.css',
 })
 export class UninstallConfirmDialogComponent {

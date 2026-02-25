@@ -19,7 +19,7 @@ import {
     ZardBadgeComponent
   ],
   templateUrl: './sidebar-nav.component.html',
-  changeDetection: ChangeDetectionStrategy.OnPush
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './sidebar-nav.component.css',
 })
 export class SidebarNavComponent {
@@ -30,6 +30,7 @@ export class SidebarNavComponent {
     { label: 'Installed', route: '/installed' },
     { label: 'Browse', route: '/browse' },
     { label: 'Taps', route: '/taps' },
+    { label: 'Cleanup', route: '/cleanup' },
     { label: 'Settings', route: '/settings' }
   ];
 }

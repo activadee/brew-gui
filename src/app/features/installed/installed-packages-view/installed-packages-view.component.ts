@@ -30,7 +30,7 @@ import { UpdatesStore } from '../../../core/stores/updates.store';
     UninstallConfirmDialogComponent
   ],
   templateUrl: './installed-packages-view.component.html',
-  changeDetection: ChangeDetectionStrategy.OnPush
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './installed-packages-view.component.css',
 })
 export class InstalledPackagesViewComponent {
