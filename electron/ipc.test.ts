@@ -12,6 +12,7 @@ describe('IPC channel allowlist', () => {
     expect(channels).toContain('app:windowControl');
     expect(channels).toContain('app:getWindowChrome');
     expect(channels).toContain('brew:installOne');
+    expect(channels).toContain('brew:reinstallOne');
     expect(channels).toContain('brew:uninstallOne');
     expect(channels).toContain('brew:pinOne');
     expect(channels).toContain('brew:unpinOne');

@@ -21,8 +21,11 @@ Brew Sidebar becomes the safest and fastest desktop control plane for Homebrew: 
   - Optional cask cleanup (`brew uninstall --zap`) for casks.
   - Confirmation with command preview and live job output.
   - Dependency-impact warning remains deferred to a later phase.
-- Add reinstall package flow:
-  - Quick fix action for broken installs.
+- [x] Add reinstall package flow (completed February 25, 2026):
+  - Reinstall formulae and casks from Installed row overflow actions.
+  - Optional cask cleanup (`brew reinstall --zap`) with explicit confirmation.
+  - Progress via existing command job drawer/events.
+  - Post-reinstall refresh for Installed/Updates/Browse while staying on Installed.
 - [x] Add pin/unpin actions (completed February 25, 2026):
   - Pin/unpin formulae from Installed and Updates rows.
   - Visual pinned badges and pinned filtering in Installed and Updates.

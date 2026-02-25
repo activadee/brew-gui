@@ -1,13 +1,14 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 
 import { ZardButtonComponent } from '@/shared/components/button';
-import type { InstalledPackage } from '../../../shared/contracts';
+import type { InstalledPackage, ReinstallOneRequest } from '../../../shared/contracts';
 import { EmptyStateComponent } from '../../components/foundation/empty-state.component';
 import { LoadingStateComponent } from '../../components/foundation/loading-state.component';
 import { PackageFilterChipsComponent } from '../../components/shared/package-filter-chips.component';
 import type { PackageRowOverflowAction } from '../../components/shared/package-row-overflow-menu.component';
 import { PackageRowComponent } from '../../components/shared/package-row.component';
 import { PackageSearchInputComponent } from '../../components/shared/package-search-input.component';
+import { ReinstallConfirmDialogComponent } from '../../components/ux/reinstall-confirm-dialog.component';
 import { UninstallConfirmDialogComponent } from '../../components/ux/uninstall-confirm-dialog.component';
 import { BrewFacadeService } from '../../core/services/brew-facade.service';
 import { ToastService } from '../../core/services/toast.service';
@@ -24,6 +25,7 @@ import { UpdatesStore } from '../../core/stores/updates.store';
     PackageFilterChipsComponent,
     PackageRowComponent,
     PackageSearchInputComponent,
+    ReinstallConfirmDialogComponent,
     UninstallConfirmDialogComponent
   ],
   template: `
@@ -102,6 +104,19 @@ import { UpdatesStore } from '../../core/stores/updates.store';
       (confirm)="confirmUninstall()"
       (zapSelectedChange)="onZapSelectedChange($event)"
     />
+
+    <app-reinstall-confirm-dialog
+      [open]="reinstallConfirmOpen()"
+      [title]="reinstallDialogTitle()"
+      [message]="reinstallDialogMessage()"
+      [commandPreview]="reinstallCommandPreview()"
+      [kind]="reinstallTarget()?.kind ?? null"
+      [zapSelected]="reinstallZapSelected()"
+      [busy]="reinstallBusy()"
+      (cancel)="closeReinstallDialog()"
+      (confirm)="confirmReinstall()"
+      (zapSelectedChange)="onReinstallZapSelectedChange($event)"
+    />
   `,
   changeDetection: ChangeDetectionStrategy.OnPush
 })
@@ -121,10 +136,14 @@ export class InstalledPackagesViewComponent {
   protected readonly selectedPackage = signal<InstalledPackage | null>(null);
   protected readonly zapSelected = signal(false);
   protected readonly uninstallBusy = signal(false);
+  protected readonly reinstallTarget = signal<InstalledPackage | null>(null);
+  protected readonly reinstallZapSelected = signal(false);
+  protected readonly reinstallBusy = signal(false);
   protected readonly actionBusy = computed(
-    () => this.uninstallBusy() || this.installedStore.pinning()
+    () => this.uninstallBusy() || this.reinstallBusy() || this.installedStore.pinning()
   );
   protected readonly uninstallConfirmOpen = computed(() => Boolean(this.selectedPackage()));
+  protected readonly reinstallConfirmOpen = computed(() => Boolean(this.reinstallTarget()));
   protected readonly pinFilterOptions = computed(() => [
     { value: 'all', label: 'All', count: this.installedStore.totalCount() },
     { value: 'pinned', label: 'Pinned', count: this.installedStore.pinnedCount() },
@@ -152,6 +171,28 @@ export class InstalledPackagesViewComponent {
       ? `brew uninstall --cask --zap ${target.name}`
       : `brew uninstall --cask ${target.name}`;
   });
+  protected readonly reinstallDialogTitle = computed(() =>
+    this.reinstallTarget() ? `Reinstall ${this.reinstallTarget()!.name}?` : 'Reinstall package?'
+  );
+  protected readonly reinstallDialogMessage = computed(() =>
+    this.reinstallTarget()?.kind === 'cask'
+      ? 'This reinstalls the selected cask. You can optionally remove related files with --zap first.'
+      : 'This reinstalls the selected formula using Homebrew.'
+  );
+  protected readonly reinstallCommandPreview = computed(() => {
+    const target = this.reinstallTarget();
+    if (!target) {
+      return null;
+    }
+
+    if (target.kind === 'formula') {
+      return `brew reinstall --formula ${target.name}`;
+    }
+
+    return this.reinstallZapSelected()
+      ? `brew reinstall --cask --zap ${target.name}`
+      : `brew reinstall --cask ${target.name}`;
+  });
 
   protected onFilterChange(value: string): void {
     this.installedStore.setKindFilter(value as 'all' | 'formula' | 'cask');
@@ -162,10 +203,12 @@ export class InstalledPackagesViewComponent {
   }
 
   protected openUninstallDialog(item: InstalledPackage): void {
-    if (this.uninstallBusy()) {
+    if (this.actionBusy()) {
       return;
     }
 
+    this.reinstallTarget.set(null);
+    this.reinstallZapSelected.set(false);
     this.selectedPackage.set(item);
     this.zapSelected.set(false);
   }
@@ -188,6 +231,11 @@ export class InstalledPackagesViewComponent {
     if (item.kind === 'cask') {
       return [
         {
+          id: 'reinstall',
+          label: 'Reinstall package',
+          disabled: busy
+        },
+        {
           id: 'pin-not-supported',
           label: 'Pin not supported for casks',
           disabled: true
@@ -196,12 +244,27 @@ export class InstalledPackagesViewComponent {
     }
 
     return item.pinned
-      ? [{ id: 'unpin', label: 'Unpin formula', disabled: busy }]
-      : [{ id: 'pin', label: 'Pin formula', disabled: busy }];
+      ? [
+          { id: 'reinstall', label: 'Reinstall package', disabled: busy },
+          { id: 'unpin', label: 'Unpin formula', disabled: busy }
+        ]
+      : [
+          { id: 'reinstall', label: 'Reinstall package', disabled: busy },
+          { id: 'pin', label: 'Pin formula', disabled: busy }
+        ];
   }
 
   protected async onOverflowAction(item: InstalledPackage, action: string): Promise<void> {
-    if (this.actionBusy() || item.kind !== 'formula') {
+    if (this.actionBusy()) {
+      return;
+    }
+
+    if (action === 'reinstall') {
+      this.openReinstallDialog(item);
+      return;
+    }
+
+    if (item.kind !== 'formula') {
       return;
     }
 
@@ -221,6 +284,30 @@ export class InstalledPackagesViewComponent {
         this.toast.push(`Unpinned ${item.name}.`, 'success');
       }
     }
+  }
+
+  protected openReinstallDialog(item: InstalledPackage): void {
+    if (this.actionBusy()) {
+      return;
+    }
+
+    this.selectedPackage.set(null);
+    this.zapSelected.set(false);
+    this.reinstallTarget.set(item);
+    this.reinstallZapSelected.set(false);
+  }
+
+  protected closeReinstallDialog(): void {
+    if (this.reinstallBusy()) {
+      return;
+    }
+
+    this.reinstallTarget.set(null);
+    this.reinstallZapSelected.set(false);
+  }
+
+  protected onReinstallZapSelectedChange(selected: boolean): void {
+    this.reinstallZapSelected.set(selected);
   }
 
   protected async confirmUninstall(): Promise<void> {
@@ -261,6 +348,47 @@ export class InstalledPackagesViewComponent {
       // Error toasts are handled by the global job-failed event bridge.
     } finally {
       this.uninstallBusy.set(false);
+    }
+  }
+
+  protected async confirmReinstall(): Promise<void> {
+    const target = this.reinstallTarget();
+    if (!target) {
+      return;
+    }
+
+    const request: ReinstallOneRequest =
+      target.kind === 'cask'
+        ? {
+            kind: target.kind,
+            name: target.name,
+            zap: this.reinstallZapSelected()
+          }
+        : {
+            kind: target.kind,
+            name: target.name
+          };
+
+    this.reinstallBusy.set(true);
+    this.reinstallTarget.set(null);
+    this.reinstallZapSelected.set(false);
+
+    try {
+      const result = await this.facade.reinstallOne(request);
+      if (!result.success) {
+        return;
+      }
+
+      await Promise.all([
+        this.installedStore.refresh(),
+        this.updatesStore.refresh(),
+        this.catalogStore.refresh()
+      ]);
+      this.toast.push(`Reinstalled ${target.name}.`, 'success');
+    } catch {
+      // Error toasts are handled by the global job-failed event bridge.
+    } finally {
+      this.reinstallBusy.set(false);
     }
   }
 }

@@ -63,11 +63,19 @@ function createInstalledStore(items: InstalledPackage[]) {
 }
 
 describe('InstalledPackagesViewComponent', () => {
-  async function render(items: InstalledPackage[], uninstallSuccess = true) {
+  async function render(
+    items: InstalledPackage[],
+    options: { uninstallSuccess?: boolean; reinstallSuccess?: boolean } = {}
+  ) {
+    const uninstallSuccess = options.uninstallSuccess ?? true;
+    const reinstallSuccess = options.reinstallSuccess ?? true;
     const installedStore = createInstalledStore(items);
     const updatesStore = { refresh: vi.fn(async () => undefined) };
     const catalogStore = { refresh: vi.fn(async () => undefined) };
-    const facade = { uninstallOne: vi.fn(async () => createJobCompleteEvent(uninstallSuccess)) };
+    const facade = {
+      uninstallOne: vi.fn(async () => createJobCompleteEvent(uninstallSuccess)),
+      reinstallOne: vi.fn(async () => createJobCompleteEvent(reinstallSuccess))
+    };
     const toast = { push: vi.fn() };
 
     await TestBed.configureTestingModule({
@@ -166,7 +174,7 @@ describe('InstalledPackagesViewComponent', () => {
   it('does not show success feedback when uninstall result is unsuccessful', async () => {
     const { fixture, facade, installedStore, updatesStore, catalogStore, toast } = await render(
       [formulaItem],
-      false
+      { uninstallSuccess: false }
     );
     const html = fixture.nativeElement as HTMLElement;
 
@@ -189,6 +197,7 @@ describe('InstalledPackagesViewComponent', () => {
     const component = fixture.componentInstance as any;
 
     expect(component.overflowActionsFor(formulaItem)).toEqual([
+      { id: 'reinstall', label: 'Reinstall package', disabled: false },
       { id: 'pin', label: 'Pin formula', disabled: false }
     ]);
   });
@@ -198,6 +207,7 @@ describe('InstalledPackagesViewComponent', () => {
     const component = fixture.componentInstance as any;
 
     expect(component.overflowActionsFor(pinnedFormulaItem)).toEqual([
+      { id: 'reinstall', label: 'Reinstall package', disabled: false },
       { id: 'unpin', label: 'Unpin formula', disabled: false }
     ]);
   });
@@ -207,8 +217,75 @@ describe('InstalledPackagesViewComponent', () => {
     const component = fixture.componentInstance as any;
 
     expect(component.overflowActionsFor(caskItem)).toEqual([
+      { id: 'reinstall', label: 'Reinstall package', disabled: false },
       { id: 'pin-not-supported', label: 'Pin not supported for casks', disabled: true }
     ]);
+  });
+
+  it('submits formula reinstall without zap', async () => {
+    const { fixture, facade, installedStore, updatesStore, catalogStore, toast } = await render([
+      formulaItem
+    ]);
+    const component = fixture.componentInstance as any;
+
+    await component.onOverflowAction(formulaItem, 'reinstall');
+    fixture.detectChanges();
+
+    const html = fixture.nativeElement as HTMLElement;
+    findButtonByText(html, 'Reinstall package')?.click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(facade.reinstallOne).toHaveBeenCalledWith({ kind: 'formula', name: 'ripgrep' });
+    expect(installedStore.refresh).toHaveBeenCalled();
+    expect(updatesStore.refresh).toHaveBeenCalled();
+    expect(catalogStore.refresh).toHaveBeenCalled();
+    expect(toast.push).toHaveBeenCalledWith('Reinstalled ripgrep.', 'success');
+  });
+
+  it('submits cask reinstall with zap when selected', async () => {
+    const { fixture, facade } = await render([caskItem]);
+    const component = fixture.componentInstance as any;
+
+    await component.onOverflowAction(caskItem, 'reinstall');
+    fixture.detectChanges();
+
+    const html = fixture.nativeElement as HTMLElement;
+    const zapToggle = html.querySelector('input[type="checkbox"]') as HTMLInputElement | null;
+    zapToggle?.click();
+    fixture.detectChanges();
+
+    findButtonByText(html, 'Reinstall package')?.click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(facade.reinstallOne).toHaveBeenCalledWith({
+      kind: 'cask',
+      name: 'visual-studio-code',
+      zap: true
+    });
+  });
+
+  it('does not show success feedback when reinstall result is unsuccessful', async () => {
+    const { fixture, facade, installedStore, updatesStore, catalogStore, toast } = await render(
+      [formulaItem],
+      { reinstallSuccess: false }
+    );
+    const component = fixture.componentInstance as any;
+
+    await component.onOverflowAction(formulaItem, 'reinstall');
+    fixture.detectChanges();
+
+    const html = fixture.nativeElement as HTMLElement;
+    findButtonByText(html, 'Reinstall package')?.click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(facade.reinstallOne).toHaveBeenCalledWith({ kind: 'formula', name: 'ripgrep' });
+    expect(installedStore.refresh).not.toHaveBeenCalled();
+    expect(updatesStore.refresh).not.toHaveBeenCalled();
+    expect(catalogStore.refresh).not.toHaveBeenCalled();
+    expect(toast.push).not.toHaveBeenCalledWith('Reinstalled ripgrep.', 'success');
   });
 
   it('pins formula and refreshes updates on overflow action', async () => {

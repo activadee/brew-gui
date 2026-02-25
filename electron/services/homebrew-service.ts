@@ -11,6 +11,7 @@ import type {
   InstalledPackage,
   OutdatedPackage,
   PinOneRequest,
+  ReinstallOneRequest,
   SearchCatalogRequest,
   SearchCatalogResponse,
   SyncMetadataResult,
@@ -50,6 +51,16 @@ export function buildInstallCommand(request: InstallOneRequest): string[] {
   return request.kind === 'formula'
     ? ['install', '--formula', request.name]
     : ['install', '--cask', request.name];
+}
+
+export function buildReinstallCommand(request: ReinstallOneRequest): string[] {
+  if (request.kind === 'formula') {
+    return ['reinstall', '--formula', request.name];
+  }
+
+  return request.zap
+    ? ['reinstall', '--cask', '--zap', request.name]
+    : ['reinstall', '--cask', request.name];
 }
 
 export function buildUninstallCommand(request: UninstallOneRequest): string[] {
@@ -257,6 +268,79 @@ export class HomebrewService {
         throw error;
       }
     }, installTimeoutMs);
+  }
+
+  async reinstallOne(request: ReinstallOneRequest, sink: JobEventSink): Promise<BrewJobCompleteEvent> {
+    const jobId = randomUUID();
+    const command = buildReinstallCommand(request);
+    const reinstallTimeoutMs = 20 * 60 * 1000;
+    const reinstallTarget =
+      request.kind === 'cask' && request.zap ? `${request.name} (--zap)` : request.name;
+
+    sink.onProgress({
+      jobId,
+      stage: 'queued',
+      message: `Queued reinstall for ${reinstallTarget}`,
+      packageName: request.name,
+      kind: request.kind,
+      timestamp: new Date().toISOString()
+    });
+
+    return this.mutationQueue.enqueue(async (signal) => {
+      sink.onProgress({
+        jobId,
+        stage: 'running',
+        message: `Reinstalling ${reinstallTarget}`,
+        packageName: request.name,
+        kind: request.kind,
+        timestamp: new Date().toISOString()
+      });
+
+      try {
+        const result = await this.runner.runText(command, {
+          signal,
+          timeoutMs: reinstallTimeoutMs,
+          onStdout: (chunk) =>
+            sink.onProgress({
+              jobId,
+              stage: 'output',
+              message: chunk,
+              packageName: request.name,
+              kind: request.kind,
+              timestamp: new Date().toISOString()
+            }),
+          onStderr: (chunk) =>
+            sink.onProgress({
+              jobId,
+              stage: 'output',
+              message: chunk,
+              packageName: request.name,
+              kind: request.kind,
+              timestamp: new Date().toISOString()
+            })
+        });
+
+        const event: BrewJobCompleteEvent = {
+          jobId,
+          success: true,
+          output: `${result.stdout}${result.stderr}`.trim(),
+          timestamp: new Date().toISOString()
+        };
+
+        sink.onComplete(event);
+        return event;
+      } catch (error) {
+        const failed: BrewJobFailedEvent = {
+          jobId,
+          error: (error as Error).message,
+          output: '',
+          timestamp: new Date().toISOString()
+        };
+
+        sink.onFailed(failed);
+        throw error;
+      }
+    }, reinstallTimeoutMs);
   }
 
   async uninstallOne(

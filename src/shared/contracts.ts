@@ -83,6 +83,23 @@ export const installOneRequestSchema = z.object({
 });
 export type InstallOneRequest = z.infer<typeof installOneRequestSchema>;
 
+export const reinstallOneRequestSchema = z
+  .object({
+    kind: packageKindSchema,
+    name: z.string().min(1),
+    zap: z.boolean().optional()
+  })
+  .superRefine((value, ctx) => {
+    if (value.kind === 'formula' && value.zap) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'zap is only supported for cask reinstall requests',
+        path: ['zap']
+      });
+    }
+  });
+export type ReinstallOneRequest = z.infer<typeof reinstallOneRequestSchema>;
+
 export const uninstallOneRequestSchema = z
   .object({
     kind: packageKindSchema,
@@ -216,6 +233,7 @@ export interface BrewGuiBridge {
   getOutdated(): Promise<OutdatedPackage[]>;
   searchCatalog(request: SearchCatalogRequest): Promise<SearchCatalogResponse>;
   installOne(request: InstallOneRequest): Promise<BrewJobCompleteEvent>;
+  reinstallOne(request: ReinstallOneRequest): Promise<BrewJobCompleteEvent>;
   uninstallOne(request: UninstallOneRequest): Promise<BrewJobCompleteEvent>;
   pinOne(request: PinOneRequest): Promise<BrewJobCompleteEvent>;
   unpinOne(request: UnpinOneRequest): Promise<BrewJobCompleteEvent>;

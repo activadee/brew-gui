@@ -10,6 +10,7 @@ import {
   checkNowResultSchema,
   installOneRequestSchema,
   pinOneRequestSchema,
+  reinstallOneRequestSchema,
   unpinOneRequestSchema,
   uninstallOneRequestSchema,
   installedPackageSchema,
@@ -65,6 +66,12 @@ const api: BrewGuiBridge = {
   async installOne(request) {
     const parsedRequest = installOneRequestSchema.parse(request);
     const payload = await ipcRenderer.invoke(IPC_CHANNELS.INSTALL_ONE, parsedRequest);
+    return brewJobCompleteEventSchema.parse(payload);
+  },
+
+  async reinstallOne(request) {
+    const parsedRequest = reinstallOneRequestSchema.parse(request);
+    const payload = await ipcRenderer.invoke(IPC_CHANNELS.REINSTALL_ONE, parsedRequest);
     return brewJobCompleteEventSchema.parse(payload);
   },
 

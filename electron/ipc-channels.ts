@@ -7,6 +7,7 @@ export const IPC_CHANNELS = {
   GET_OUTDATED: 'brew:getOutdated',
   SEARCH_CATALOG: 'brew:searchCatalog',
   INSTALL_ONE: 'brew:installOne',
+  REINSTALL_ONE: 'brew:reinstallOne',
   UNINSTALL_ONE: 'brew:uninstallOne',
   PIN_ONE: 'brew:pinOne',
   UNPIN_ONE: 'brew:unpinOne',
