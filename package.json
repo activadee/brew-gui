@@ -1,0 +1,100 @@
+{
+  "name": "brew-gui",
+  "version": "0.1.0",
+  "description": "Minimalistic Homebrew sidebar desktop app",
+  "private": true,
+  "packageManager": "npm@11.6.2",
+  "main": "dist-electron/main.js",
+  "scripts": {
+    "ng": "ng",
+    "start": "npm run dev",
+    "dev": "concurrently -k -n WEB,ELECTRON_BUILD,ELECTRON \"npm:dev:web\" \"npm:dev:electron:build\" \"npm:dev:electron:start\"",
+    "dev:web": "ng serve --host 127.0.0.1 --port 4200",
+    "dev:electron:build": "tsup --config tsup.config.ts --watch",
+    "dev:electron:start": "wait-on http://127.0.0.1:4200 file:dist-electron/main.js file:dist-electron/preload.js && ELECTRON_START_URL=http://127.0.0.1:4200 electron dist-electron/main.js",
+    "build": "npm run build:web && npm run build:electron",
+    "build:web": "ng build --configuration production",
+    "build:electron": "tsup --config tsup.config.ts",
+    "watch": "ng build --watch --configuration development",
+    "test": "ng test --watch=false",
+    "test:node": "vitest run",
+    "test:all": "npm run test && npm run test:node",
+    "package:mac": "npm run build && electron-builder --mac",
+    "package:dir": "npm run build && electron-builder --dir"
+  },
+  "prettier": {
+    "printWidth": 100,
+    "singleQuote": true,
+    "overrides": [
+      {
+        "files": "*.html",
+        "options": {
+          "parser": "angular"
+        }
+      }
+    ]
+  },
+  "dependencies": {
+    "@angular/common": "^21.1.0",
+    "@angular/compiler": "^21.1.0",
+    "@angular/core": "^21.1.0",
+    "@angular/forms": "^21.1.0",
+    "@angular/platform-browser": "^21.1.0",
+    "@angular/router": "^21.1.0",
+    "@ngrx/signals": "^21.0.1",
+    "@tailwindcss/postcss": "^4.2.1",
+    "electron-store": "^11.0.2",
+    "rxjs": "~7.8.0",
+    "tailwindcss": "^4.2.1",
+    "tslib": "^2.3.0",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@angular/build": "^21.1.5",
+    "@angular/cli": "^21.1.5",
+    "@angular/compiler-cli": "^21.1.0",
+    "@types/node": "^25.3.0",
+    "@vitest/coverage-v8": "^4.0.18",
+    "concurrently": "^9.2.1",
+    "electron": "^40.6.1",
+    "electron-builder": "^26.8.1",
+    "electron-updater": "^6.8.3",
+    "jsdom": "^27.1.0",
+    "tsup": "^8.5.1",
+    "tsx": "^4.21.0",
+    "typescript": "~5.9.2",
+    "vitest": "^4.0.18",
+    "wait-on": "^9.0.4"
+  },
+  "build": {
+    "appId": "com.brewsidebar.app",
+    "productName": "Brew Sidebar",
+    "asar": true,
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/brew-gui/browser/**/*",
+      "dist-electron/**/*",
+      "public/icons/**/*",
+      "package.json"
+    ],
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "category": "public.app-category.developer-tools",
+      "artifactName": "${productName}-${version}-${arch}.${ext}"
+    },
+    "publish": [
+      {
+        "provider": "generic",
+        "url": "https://example.com/auto-updates/"
+      }
+    ],
+    "extraMetadata": {
+      "main": "dist-electron/main.js"
+    }
+  }
+}
