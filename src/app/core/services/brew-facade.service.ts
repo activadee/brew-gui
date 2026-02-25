@@ -14,8 +14,12 @@ import type {
   SearchCatalogRequest,
   SearchCatalogResponse,
   SyncMetadataResult,
+  UninstallOneRequest,
   UpdatesChangedEvent,
-  UpgradeOneRequest
+  UpgradeOneRequest,
+  WindowChromeChangedEvent,
+  WindowChromeState,
+  WindowControlAction
 } from '../../../shared/contracts';
 import { BrewBridgeService } from './brew-bridge.service';
 
@@ -27,6 +31,14 @@ export class BrewFacadeService {
 
   openMainWindow(): Promise<void> {
     return this.bridge.api.openMainWindow();
+  }
+
+  windowControl(action: WindowControlAction): Promise<void> {
+    return this.bridge.api.windowControl(action);
+  }
+
+  getWindowChromeState(): Promise<WindowChromeState> {
+    return this.bridge.api.getWindowChromeState();
   }
 
   getAvailability(): Promise<BrewAvailability> {
@@ -47,6 +59,10 @@ export class BrewFacadeService {
 
   installOne(request: InstallOneRequest): Promise<BrewJobCompleteEvent> {
     return this.bridge.api.installOne(request);
+  }
+
+  uninstallOne(request: UninstallOneRequest): Promise<BrewJobCompleteEvent> {
+    return this.bridge.api.uninstallOne(request);
   }
 
   upgradeOne(request: UpgradeOneRequest): Promise<BrewJobCompleteEvent> {
@@ -75,6 +91,10 @@ export class BrewFacadeService {
 
   onUpdatesChanged(handler: (event: UpdatesChangedEvent) => void): () => void {
     return this.bridge.api.onUpdatesChanged(handler);
+  }
+
+  onWindowChromeChanged(handler: (event: WindowChromeChangedEvent) => void): () => void {
+    return this.bridge.api.onWindowChromeChanged(handler);
   }
 
   onJobProgress(handler: (event: BrewJobProgressEvent) => void): () => void {

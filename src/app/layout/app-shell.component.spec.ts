@@ -1,0 +1,148 @@
+import { Component, signal } from '@angular/core';
+import { TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
+import { describe, expect, it, vi } from 'vitest';
+
+import type { WindowChromeState } from '../../shared/contracts';
+import { BrewFacadeService } from '../core/services/brew-facade.service';
+import { ToastService } from '../core/services/toast.service';
+import { AppStatusStore } from '../core/stores/app-status.store';
+import { CatalogStore } from '../core/stores/catalog.store';
+import { InstalledStore } from '../core/stores/installed.store';
+import { JobsStore } from '../core/stores/jobs.store';
+import { SettingsStore } from '../core/stores/settings.store';
+import { UpdatesStore } from '../core/stores/updates.store';
+import { AppShellComponent } from './app-shell.component';
+
+@Component({ standalone: true, template: '<p>view</p>' })
+class DummyRouteComponent {}
+
+const chromeState: WindowChromeState = {
+  platform: 'darwin',
+  isFocused: true,
+  isMaximized: false,
+  isFullScreen: false,
+  canClose: true,
+  canMinimize: true,
+  canZoom: true,
+  canFullScreen: true
+};
+
+describe('AppShellComponent titlebar', () => {
+  async function render() {
+    const appStatusStore = {
+      availability: signal({
+        available: true,
+        path: '/opt/homebrew/bin/brew',
+        version: '4.5.1',
+        checkedAt: new Date().toISOString()
+      }),
+      initialize: vi.fn(async () => undefined),
+      applyUpdatesChanged: vi.fn()
+    };
+
+    const catalogStore = { refresh: vi.fn(async () => undefined) };
+    const installedStore = { refresh: vi.fn(async () => undefined) };
+    const updatesStore = {
+      updateCount: signal(2),
+      lastCheckedAt: signal<string | null>(new Date().toISOString()),
+      refresh: vi.fn(async () => undefined),
+      checkNow: vi.fn(async () => undefined),
+      setExternalUpdate: vi.fn()
+    };
+
+    const jobsStore = {
+      drawerOpen: signal(false),
+      latestEvents: signal<{ timestamp: string; message: string }[]>([]),
+      latestFailed: signal<{ error: string } | null>(null),
+      closeDrawer: vi.fn(),
+      clearHistory: vi.fn(),
+      pushProgress: vi.fn(),
+      markComplete: vi.fn(),
+      markFailed: vi.fn()
+    };
+
+    const settingsStore = { load: vi.fn(async () => undefined) };
+
+    const facade = {
+      isElectron: true,
+      getWindowChromeState: vi.fn(async () => chromeState),
+      syncMetadata: vi.fn(async () => ({ success: true, output: '', syncedAt: new Date().toISOString() })),
+      onUpdatesChanged: vi.fn(() => () => undefined),
+      onWindowChromeChanged: vi.fn(() => () => undefined),
+      onJobProgress: vi.fn(() => () => undefined),
+      onJobComplete: vi.fn(() => () => undefined),
+      onJobFailed: vi.fn(() => () => undefined)
+    };
+
+    const toast = {
+      toasts: signal<
+        Array<{
+          id: string;
+          message: string;
+          kind: 'info' | 'success' | 'error';
+        }>
+      >([]),
+      dismiss: vi.fn(),
+      push: vi.fn()
+    };
+
+    await TestBed.configureTestingModule({
+      imports: [AppShellComponent],
+      providers: [
+        provideRouter([
+          { path: 'updates', component: DummyRouteComponent },
+          { path: 'installed', component: DummyRouteComponent },
+          { path: 'browse', component: DummyRouteComponent },
+          { path: 'settings', component: DummyRouteComponent },
+          { path: '', pathMatch: 'full', redirectTo: 'updates' }
+        ]),
+        { provide: AppStatusStore, useValue: appStatusStore },
+        { provide: CatalogStore, useValue: catalogStore },
+        { provide: InstalledStore, useValue: installedStore },
+        { provide: UpdatesStore, useValue: updatesStore },
+        { provide: JobsStore, useValue: jobsStore },
+        { provide: SettingsStore, useValue: settingsStore },
+        { provide: BrewFacadeService, useValue: facade },
+        { provide: ToastService, useValue: toast }
+      ]
+    }).compileComponents();
+
+    const fixture = TestBed.createComponent(AppShellComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    return { fixture, facade };
+  }
+
+  it('marks the titlebar as draggable and controls as non-draggable', async () => {
+    const { fixture } = await render();
+    const html = fixture.nativeElement as HTMLElement;
+
+    const titlebar = html.querySelector('.brew-titlebar');
+    const paletteButton = html.querySelector('[data-testid="titlebar-palette"]');
+    const customTrafficLight = html.querySelector('[data-testid="traffic-close"]');
+
+    expect(titlebar?.classList.contains('drag-region')).toBe(true);
+    expect(paletteButton?.classList.contains('no-drag')).toBe(true);
+    expect(customTrafficLight).toBeNull();
+  });
+
+  it('opens command palette from titlebar quick action', async () => {
+    const { fixture } = await render();
+    const html = fixture.nativeElement as HTMLElement;
+
+    const paletteButton = html.querySelector(
+      '[data-testid="titlebar-palette"]'
+    ) as HTMLButtonElement | null;
+
+    paletteButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    fixture.detectChanges();
+
+    const paletteAction = Array.from(html.querySelectorAll('[role="option"]')).find((option) =>
+      option.textContent?.includes('Check for updates now')
+    );
+    expect(paletteAction).toBeTruthy();
+  });
+});

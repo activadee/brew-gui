@@ -1,25 +1,16 @@
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
 
+import { ZardBadgeComponent } from '@/shared/components/badge';
+import { ZardIconComponent } from '@/shared/components/icon';
+
 @Component({
   selector: 'app-connection-status-pill',
+  imports: [ZardBadgeComponent, ZardIconComponent],
   template: `
-    <div
-      class="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs mono transition-colors duration-200"
-      [class.border-emerald-300]="available()"
-      [class.bg-emerald-50]="available()"
-      [class.text-emerald-700]="available()"
-      [class.border-amber-300]="!available()"
-      [class.bg-amber-50]="!available()"
-      [class.text-amber-800]="!available()"
-    >
-      <span
-        class="h-1.5 w-1.5 rounded-full"
-        [class.bg-emerald-500]="available()"
-        [class.bg-amber-500]="!available()"
-        [class.animate-pulse]="available()"
-      ></span>
+    <z-badge [zType]="available() ? 'secondary' : 'outline'" zShape="pill" class="gap-1.5 mono text-[10px] uppercase tracking-[0.08em]">
+      <z-icon [zType]="available() ? 'circle-check' : 'circle-alert'" zSize="sm" />
       <span>{{ label() }}</span>
-    </div>
+    </z-badge>
   `,
   changeDetection: ChangeDetectionStrategy.OnPush
 })

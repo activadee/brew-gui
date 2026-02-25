@@ -1,12 +1,18 @@
 import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 
+import { ZardCardComponent } from '@/shared/components/card';
+import { ZardLoaderComponent } from '@/shared/components/loader';
+
 @Component({
   selector: 'app-loading-state',
+  imports: [ZardCardComponent, ZardLoaderComponent],
   template: `
-    <div class="card-surface panel-reveal flex items-center gap-3 px-4 py-3 text-sm text-[var(--text-muted)]">
-      <span class="inline-block h-3 w-3 animate-pulse rounded-full bg-[var(--accent)]"></span>
-      <span>{{ label() }}</span>
-    </div>
+    <z-card class="rounded-lg border-border/70 bg-card/90 shadow-sm">
+      <div class="flex items-center gap-3 py-1">
+        <z-loader zSize="sm" />
+        <span class="text-sm text-muted-foreground">{{ label() }}</span>
+      </div>
+    </z-card>
   `,
   changeDetection: ChangeDetectionStrategy.OnPush
 })

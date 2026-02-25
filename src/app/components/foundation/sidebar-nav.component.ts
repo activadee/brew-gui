@@ -1,27 +1,45 @@
 import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 
+import { ZardBadgeComponent } from '@/shared/components/badge';
+import { ZardButtonComponent } from '@/shared/components/button';
+import {
+  SidebarComponent,
+  SidebarGroupComponent
+} from '@/shared/components/layout';
+
 @Component({
   selector: 'app-sidebar-nav',
-  imports: [RouterLink, RouterLinkActive],
+  imports: [
+    RouterLink,
+    RouterLinkActive,
+    SidebarComponent,
+    SidebarGroupComponent,
+    ZardButtonComponent,
+    ZardBadgeComponent
+  ],
   template: `
-    <aside class="panel-reveal border-b border-[var(--stroke)] bg-[var(--bg-elevated)] px-3 py-3 md:h-full md:border-b-0 md:border-r md:py-4">
-      <p class="mono px-2 text-[10px] uppercase tracking-[0.22em] text-[var(--text-muted)]">Brew Sidebar</p>
-      <nav class="mt-3 flex flex-wrap gap-1 md:mt-4 md:flex-col">
-        @for (item of navItems; track item.route) {
-          <a
-            [routerLink]="item.route"
-            routerLinkActive="nav-link-active bg-[var(--accent-soft)] text-[var(--accent)]"
-            class="nav-link hover-lift flex items-center justify-between rounded-lg px-3 py-2 text-sm text-[var(--text-main)] transition-colors hover:bg-[#eeebe4] md:w-full"
-          >
-            <span>{{ item.label }}</span>
-            @if (item.route === '/updates' && updateCount() > 0) {
-              <span class="pulse-badge mono rounded-full border border-[var(--accent)] bg-white px-2 py-0.5 text-[10px] text-[var(--accent)]">{{ updateCount() }}</span>
-            }
-          </a>
-        }
-      </nav>
-    </aside>
+    <z-sidebar class="brew-sidebar-surface" [zCollapsible]="false">
+      <z-sidebar-group>
+        <nav class="mt-0 flex flex-col gap-1">
+          @for (item of navItems; track item.route) {
+            <a
+              [routerLink]="item.route"
+              routerLinkActive="brew-nav-active"
+              z-button
+              zType="ghost"
+              zSize="sm"
+              class="brew-nav-link"
+            >
+              <span>{{ item.label }}</span>
+              @if (item.route === '/updates' && updateCount() > 0) {
+                <z-badge zType="secondary" zShape="pill">{{ updateCount() }}</z-badge>
+              }
+            </a>
+          }
+        </nav>
+      </z-sidebar-group>
+    </z-sidebar>
   `,
   changeDetection: ChangeDetectionStrategy.OnPush
 })

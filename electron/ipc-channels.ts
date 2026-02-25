@@ -1,10 +1,13 @@
 export const IPC_CHANNELS = {
   APP_OPEN_MAIN: 'app:openMain',
+  APP_WINDOW_CONTROL: 'app:windowControl',
+  APP_GET_WINDOW_CHROME: 'app:getWindowChrome',
   GET_BREW_AVAILABILITY: 'brew:getAvailability',
   GET_INSTALLED: 'brew:getInstalled',
   GET_OUTDATED: 'brew:getOutdated',
   SEARCH_CATALOG: 'brew:searchCatalog',
   INSTALL_ONE: 'brew:installOne',
+  UNINSTALL_ONE: 'brew:uninstallOne',
   UPGRADE_ONE: 'brew:upgradeOne',
   UPGRADE_ALL: 'brew:upgradeAll',
   CHECK_NOW: 'brew:checkNow',
@@ -12,6 +15,7 @@ export const IPC_CHANNELS = {
   GET_SETTINGS: 'settings:get',
   UPDATE_SETTINGS: 'settings:update',
   EVENTS_UPDATES_CHANGED: 'updates:changed',
+  EVENTS_WINDOW_CHROME_CHANGED: 'app:windowChromeChanged',
   EVENTS_JOB_PROGRESS: 'brew:job-progress',
   EVENTS_JOB_COMPLETE: 'brew:job-complete',
   EVENTS_JOB_FAILED: 'brew:job-failed'

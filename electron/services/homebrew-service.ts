@@ -13,6 +13,7 @@ import type {
   SearchCatalogRequest,
   SearchCatalogResponse,
   SyncMetadataResult,
+  UninstallOneRequest,
   UpgradeOneRequest
 } from '../../src/shared/contracts';
 import { searchCatalogRequestSchema } from '../../src/shared/contracts';
@@ -47,6 +48,16 @@ export function buildInstallCommand(request: InstallOneRequest): string[] {
   return request.kind === 'formula'
     ? ['install', '--formula', request.name]
     : ['install', '--cask', request.name];
+}
+
+export function buildUninstallCommand(request: UninstallOneRequest): string[] {
+  if (request.kind === 'formula') {
+    return ['uninstall', '--formula', request.name];
+  }
+
+  return request.zap
+    ? ['uninstall', '--cask', '--zap', request.name]
+    : ['uninstall', '--cask', request.name];
 }
 
 export class HomebrewService {
@@ -236,6 +247,81 @@ export class HomebrewService {
         throw error;
       }
     }, installTimeoutMs);
+  }
+
+  async uninstallOne(
+    request: UninstallOneRequest,
+    sink: JobEventSink
+  ): Promise<BrewJobCompleteEvent> {
+    const jobId = randomUUID();
+    const command = buildUninstallCommand(request);
+    const uninstallTimeoutMs = 20 * 60 * 1000;
+    const uninstallTarget = request.kind === 'cask' && request.zap ? `${request.name} (--zap)` : request.name;
+
+    sink.onProgress({
+      jobId,
+      stage: 'queued',
+      message: `Queued uninstall for ${uninstallTarget}`,
+      packageName: request.name,
+      kind: request.kind,
+      timestamp: new Date().toISOString()
+    });
+
+    return this.mutationQueue.enqueue(async (signal) => {
+      sink.onProgress({
+        jobId,
+        stage: 'running',
+        message: `Uninstalling ${uninstallTarget}`,
+        packageName: request.name,
+        kind: request.kind,
+        timestamp: new Date().toISOString()
+      });
+
+      try {
+        const result = await this.runner.runText(command, {
+          signal,
+          timeoutMs: uninstallTimeoutMs,
+          onStdout: (chunk) =>
+            sink.onProgress({
+              jobId,
+              stage: 'output',
+              message: chunk,
+              packageName: request.name,
+              kind: request.kind,
+              timestamp: new Date().toISOString()
+            }),
+          onStderr: (chunk) =>
+            sink.onProgress({
+              jobId,
+              stage: 'output',
+              message: chunk,
+              packageName: request.name,
+              kind: request.kind,
+              timestamp: new Date().toISOString()
+            })
+        });
+
+        const event: BrewJobCompleteEvent = {
+          jobId,
+          success: true,
+          output: `${result.stdout}${result.stderr}`.trim(),
+          timestamp: new Date().toISOString()
+        };
+
+        sink.onComplete(event);
+        return event;
+      } catch (error) {
+        const failed: BrewJobFailedEvent = {
+          jobId,
+          error: (error as Error).message,
+          output: '',
+          timestamp: new Date().toISOString()
+        };
+
+        sink.onFailed(failed);
+        throw error;
+      }
+    }, uninstallTimeoutMs);
   }
 
   async upgradeAll(sink: JobEventSink): Promise<BrewJobCompleteEvent> {

@@ -9,6 +9,8 @@ import {
   type BrowserWindowConstructorOptions
 } from 'electron';
 
+import type { WindowChromeState, WindowControlAction } from '../src/shared/contracts';
+import { IPC_CHANNELS } from './ipc-channels';
 import { registerIpcHandlers } from './ipc';
 import { configureAutoUpdate } from './services/auto-update';
 import { HomebrewService } from './services/homebrew-service';
@@ -16,6 +18,7 @@ import { SettingsStore } from './services/settings-store';
 import { log } from './utils/logger';
 
 const isDev = !app.isPackaged || Boolean(process.env.ELECTRON_START_URL);
+const isDarwin = process.platform === 'darwin';
 
 let mainWindow: BrowserWindow | null = null;
 let trayWindow: BrowserWindow | null = null;
@@ -28,6 +31,43 @@ const homebrewService = new HomebrewService();
 
 const preloadPath = path.join(__dirname, 'preload.js');
 
+function resolveWindowPlatform(platform: NodeJS.Platform): WindowChromeState['platform'] {
+  switch (platform) {
+    case 'darwin':
+    case 'linux':
+    case 'win32':
+      return platform;
+    default:
+      return 'unknown';
+  }
+}
+
+function getMainWindowChromeState(): WindowChromeState {
+  const window = mainWindow && !mainWindow.isDestroyed() ? mainWindow : null;
+  const hasWindow = Boolean(window);
+
+  return {
+    platform: resolveWindowPlatform(process.platform),
+    isFocused: window?.isFocused() ?? false,
+    isMaximized: window?.isMaximized() ?? false,
+    isFullScreen: window?.isFullScreen() ?? false,
+    canClose: hasWindow,
+    canMinimize: hasWindow,
+    canZoom: hasWindow,
+    canFullScreen: hasWindow
+  };
+}
+
+function emitWindowChromeChanged(): void {
+  const payload = getMainWindowChromeState();
+
+  for (const window of BrowserWindow.getAllWindows()) {
+    if (!window.isDestroyed()) {
+      window.webContents.send(IPC_CHANNELS.EVENTS_WINDOW_CHROME_CHANGED, payload);
+    }
+  }
+}
+
 function createMainWindow(): BrowserWindow {
   const settings = settingsStore.getSettings();
 
@@ -37,9 +77,16 @@ function createMainWindow(): BrowserWindow {
     minWidth: 880,
     minHeight: 620,
     title: 'Brew Sidebar',
-    backgroundColor: '#f4f2ed',
+    backgroundColor: '#ececef',
     autoHideMenuBar: true,
     skipTaskbar: false,
+    frame: !isDarwin,
+    ...(isDarwin
+      ? {
+          vibrancy: 'sidebar' as const,
+          visualEffectState: 'followWindow' as const
+        }
+      : {}),
     webPreferences: {
       preload: preloadPath,
       contextIsolation: true,
@@ -51,14 +98,47 @@ function createMainWindow(): BrowserWindow {
   loadRenderer(window, `/${settings.defaultView}`);
 
   window.on('close', (event) => {
-    if (process.platform === 'darwin' && !isQuitting) {
+    if (isDarwin && !isQuitting) {
       event.preventDefault();
       hideMainWindowToTray();
     }
   });
 
+  window.on('focus', () => {
+    emitWindowChromeChanged();
+  });
+
+  window.on('blur', () => {
+    emitWindowChromeChanged();
+  });
+
+  window.on('maximize', () => {
+    emitWindowChromeChanged();
+  });
+
+  window.on('unmaximize', () => {
+    emitWindowChromeChanged();
+  });
+
+  window.on('enter-full-screen', () => {
+    emitWindowChromeChanged();
+  });
+
+  window.on('leave-full-screen', () => {
+    emitWindowChromeChanged();
+  });
+
+  window.on('show', () => {
+    emitWindowChromeChanged();
+  });
+
+  window.on('hide', () => {
+    emitWindowChromeChanged();
+  });
+
   window.on('closed', () => {
     mainWindow = null;
+    emitWindowChromeChanged();
   });
 
   return window;
@@ -74,7 +154,7 @@ function createTrayWindow(): BrowserWindow {
     show: false,
     alwaysOnTop: true,
     skipTaskbar: true,
-    backgroundColor: '#f4f2ed',
+    backgroundColor: '#ececef',
     webPreferences: {
       preload: preloadPath,
       contextIsolation: true,
@@ -142,23 +222,56 @@ function createTray(): Tray {
 
 function showMainWindow(): void {
   mainWindow ??= createMainWindow();
-  if (process.platform === 'darwin') {
+  if (isDarwin) {
     app.dock.show();
   }
   mainWindow.setSkipTaskbar(false);
   mainWindow.show();
   mainWindow.focus();
+  emitWindowChromeChanged();
 }
 
 function hideMainWindowToTray(): void {
   if (!mainWindow) {
     return;
   }
+
   mainWindow.hide();
   mainWindow.setSkipTaskbar(true);
-  if (process.platform === 'darwin') {
+  if (isDarwin) {
     app.dock.hide();
   }
+
+  emitWindowChromeChanged();
+}
+
+function controlMainWindow(action: WindowControlAction): void {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    return;
+  }
+
+  switch (action) {
+    case 'close':
+      mainWindow.close();
+      break;
+    case 'minimize':
+      mainWindow.minimize();
+      break;
+    case 'toggleZoom':
+      if (mainWindow.isMaximized()) {
+        mainWindow.unmaximize();
+      } else {
+        mainWindow.maximize();
+      }
+      break;
+    case 'toggleFullScreen':
+      mainWindow.setFullScreen(!mainWindow.isFullScreen());
+      break;
+    default:
+      break;
+  }
+
+  emitWindowChromeChanged();
 }
 
 function loadTrayIcon() {
@@ -182,7 +295,7 @@ function loadTrayIcon() {
   }
 
   const resized = baseIcon.resize({ width: 18, height: 18, quality: 'best' });
-  if (process.platform === 'darwin') {
+  if (isDarwin) {
     resized.setTemplateImage(true);
   }
 
@@ -277,7 +390,11 @@ function registerHandlers(): void {
     onOpenMainWindow: () => {
       showMainWindow();
       trayWindow?.hide();
-    }
+    },
+    onWindowControl: (action) => {
+      controlMainWindow(action);
+    },
+    getWindowChromeState: () => getMainWindowChromeState()
   });
 }
 
@@ -289,6 +406,7 @@ async function bootstrap(): Promise<void> {
   registerHandlers();
   configureAutoUpdate();
   refreshScheduler();
+  emitWindowChromeChanged();
 
   const settings = settingsStore.getSettings();
   if (settings.autoCheckOnLaunch) {
@@ -308,7 +426,7 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
+  if (!isDarwin) {
     app.quit();
   }
 });

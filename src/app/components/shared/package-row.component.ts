@@ -1,19 +1,20 @@
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
 
+import { ZardCardComponent } from '@/shared/components/card';
 import type { PackageKind } from '../../../shared/contracts';
 import { PackageActionButtonComponent } from './package-action-button.component';
 import { PackageMetaComponent } from './package-meta.component';
 
 @Component({
   selector: 'app-package-row',
-  imports: [PackageMetaComponent, PackageActionButtonComponent],
+  imports: [ZardCardComponent, PackageMetaComponent, PackageActionButtonComponent],
   template: `
-    <article class="fade-up hover-lift rounded-xl border border-[var(--stroke)] bg-white/95 p-3">
-      <div class="flex items-start justify-between gap-3">
+    <z-card class="fade-up border-border/70 bg-card/95 shadow-sm">
+      <div class="flex items-start justify-between gap-2">
         <div class="min-w-0">
-          <h4 class="truncate text-sm font-semibold text-[var(--text-main)]">{{ name() }}</h4>
+          <h4 class="truncate text-sm font-semibold">{{ name() }}</h4>
           @if (desc()) {
-            <p class="mt-1 text-xs text-[var(--text-muted)]">{{ desc() }}</p>
+            <p class="mt-0.5 text-xs text-muted-foreground">{{ desc() }}</p>
           }
           <app-package-meta
             [kind]="kind()"
@@ -32,7 +33,7 @@ import { PackageMetaComponent } from './package-meta.component';
           />
         }
       </div>
-    </article>
+    </z-card>
   `,
   changeDetection: ChangeDetectionStrategy.OnPush
 })

@@ -1,14 +1,15 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal } from '@angular/core';
 
+import { ZardButtonComponent } from '@/shared/components/button';
+import type { CatalogPackage } from '../../../shared/contracts';
 import { EmptyStateComponent } from '../../components/foundation/empty-state.component';
 import { LoadingStateComponent } from '../../components/foundation/loading-state.component';
 import { PackageFilterChipsComponent } from '../../components/shared/package-filter-chips.component';
 import { PackageRowComponent } from '../../components/shared/package-row.component';
 import { PackageSearchInputComponent } from '../../components/shared/package-search-input.component';
 import { UpgradeConfirmDialogComponent } from '../../components/ux/upgrade-confirm-dialog.component';
-import type { CatalogPackage } from '../../../shared/contracts';
-import { ToastService } from '../../core/services/toast.service';
 import { BrewFacadeService } from '../../core/services/brew-facade.service';
+import { ToastService } from '../../core/services/toast.service';
 import { CatalogStore } from '../../core/stores/catalog.store';
 import { InstalledStore } from '../../core/stores/installed.store';
 import { UpdatesStore } from '../../core/stores/updates.store';
@@ -16,6 +17,7 @@ import { UpdatesStore } from '../../core/stores/updates.store';
 @Component({
   selector: 'app-browse-catalog-view',
   imports: [
+    ZardButtonComponent,
     EmptyStateComponent,
     LoadingStateComponent,
     PackageFilterChipsComponent,
@@ -24,12 +26,14 @@ import { UpdatesStore } from '../../core/stores/updates.store';
     UpgradeConfirmDialogComponent
   ],
   template: `
-    <section class="ui-shell-enter space-y-3">
-      <header class="flex flex-wrap items-center justify-between gap-3">
+    <section class="ui-shell-enter space-y-2">
+      <header class="flex flex-wrap items-center justify-between gap-2">
         <h2 class="text-lg font-semibold">Browse Homebrew Catalog</h2>
         <button
           type="button"
-          class="btn-ui btn-ui-ghost"
+          z-button
+          zType="outline"
+          zSize="sm"
           (click)="catalogStore.refresh(true)"
         >
           Refresh Catalog
@@ -48,12 +52,12 @@ import { UpdatesStore } from '../../core/stores/updates.store';
         (selectedChange)="onKindChange($event)"
       />
 
-      <div class="flex items-center justify-between text-xs text-[var(--text-muted)] mono">
+      <div class="flex items-center justify-between text-xs text-muted-foreground mono">
         <span>Total {{ catalogStore.total() }}</span>
         <span>
           Source {{ catalogStore.source() }}
           @if (catalogStore.stale()) {
-            <strong class="text-[var(--danger)]">(stale cache)</strong>
+            <strong class="text-destructive">(stale cache)</strong>
           }
         </span>
       </div>
@@ -65,7 +69,7 @@ import { UpdatesStore } from '../../core/stores/updates.store';
       } @else if (catalogStore.items().length === 0) {
         <app-empty-state label="No catalog results" description="Try a broader query." />
       } @else {
-        <div class="stagger-list space-y-2">
+        <div class="stagger-list space-y-1.5">
           @for (item of catalogStore.items(); track item.id) {
             <app-package-row
               [name]="item.name"
@@ -85,16 +89,20 @@ import { UpdatesStore } from '../../core/stores/updates.store';
       <footer class="flex items-center justify-end gap-2">
         <button
           type="button"
-          class="btn-ui btn-ui-ghost"
-          [disabled]="!catalogStore.hasPreviousPage()"
+          z-button
+          zType="outline"
+          zSize="sm"
+          [zDisabled]="!catalogStore.hasPreviousPage()"
           (click)="catalogStore.previousPage()"
         >
           Previous
         </button>
         <button
           type="button"
-          class="btn-ui btn-ui-ghost"
-          [disabled]="!catalogStore.hasNextPage()"
+          z-button
+          zType="outline"
+          zSize="sm"
+          [zDisabled]="!catalogStore.hasNextPage()"
           (click)="catalogStore.nextPage()"
         >
           Next

@@ -1,5 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 
+import { ZardButtonComponent } from '@/shared/components/button';
+import type { OutdatedPackage } from '../../../shared/contracts';
 import { EmptyStateComponent } from '../../components/foundation/empty-state.component';
 import { LoadingStateComponent } from '../../components/foundation/loading-state.component';
 import { PackageFilterChipsComponent } from '../../components/shared/package-filter-chips.component';
@@ -7,13 +9,13 @@ import { PackageRowComponent } from '../../components/shared/package-row.compone
 import { PackageSearchInputComponent } from '../../components/shared/package-search-input.component';
 import { UpdateSummaryCardComponent } from '../../components/ux/update-summary-card.component';
 import { UpgradeConfirmDialogComponent } from '../../components/ux/upgrade-confirm-dialog.component';
-import type { OutdatedPackage } from '../../../shared/contracts';
 import { ToastService } from '../../core/services/toast.service';
 import { UpdatesStore } from '../../core/stores/updates.store';
 
 @Component({
   selector: 'app-updates-view',
   imports: [
+    ZardButtonComponent,
     EmptyStateComponent,
     LoadingStateComponent,
     PackageFilterChipsComponent,
@@ -23,23 +25,26 @@ import { UpdatesStore } from '../../core/stores/updates.store';
     UpgradeConfirmDialogComponent
   ],
   template: `
-    <section class="ui-shell-enter space-y-3">
-      <header class="flex flex-wrap items-center justify-between gap-3">
+    <section class="ui-shell-enter space-y-2">
+      <header class="flex flex-wrap items-center justify-between gap-2">
         <h2 class="text-lg font-semibold">Available Updates</h2>
-        <div class="flex gap-2">
+        <div class="flex gap-1.5">
           <button
             type="button"
-            class="btn-ui btn-ui-ghost"
+            z-button
+            zType="outline"
+            zSize="sm"
             (click)="updatesStore.checkNow()"
-            [disabled]="updatesStore.loading()"
+            [zDisabled]="updatesStore.loading()"
           >
             Check now
           </button>
           <button
             type="button"
-            class="btn-ui btn-ui-primary"
+            z-button
+            zSize="sm"
             (click)="openUpgradeAll()"
-            [disabled]="updatesStore.updateCount() === 0 || updatesStore.upgrading()"
+            [zDisabled]="updatesStore.updateCount() === 0 || updatesStore.upgrading()"
           >
             Upgrade all
           </button>
@@ -69,7 +74,7 @@ import { UpdatesStore } from '../../core/stores/updates.store';
           description="Everything looks up to date for the selected package type."
         />
       } @else {
-        <div class="stagger-list space-y-2">
+        <div class="stagger-list space-y-1.5">
           @for (item of updatesStore.filteredItems(); track item.id) {
             <app-package-row
               [name]="item.name"

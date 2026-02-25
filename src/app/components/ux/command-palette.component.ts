@@ -1,5 +1,15 @@
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
 
+import {
+  ZardCommandComponent,
+  ZardCommandEmptyComponent,
+  ZardCommandInputComponent,
+  ZardCommandListComponent,
+  ZardCommandOptionComponent,
+  ZardCommandOptionGroupComponent,
+  type ZardCommandOption
+} from '@/shared/components/command';
+
 export interface CommandPaletteAction {
   id: string;
   label: string;
@@ -8,20 +18,36 @@ export interface CommandPaletteAction {
 
 @Component({
   selector: 'app-command-palette',
+  imports: [
+    ZardCommandComponent,
+    ZardCommandInputComponent,
+    ZardCommandListComponent,
+    ZardCommandEmptyComponent,
+    ZardCommandOptionGroupComponent,
+    ZardCommandOptionComponent
+  ],
   template: `
     @if (open()) {
-      <div class="fixed inset-0 z-40 bg-black/28 backdrop-blur-[2px]" (click)="closed.emit()"></div>
-      <section class="palette-surface ui-shell-enter fixed left-1/2 top-20 z-50 w-[560px] max-w-[92vw] -translate-x-1/2 p-2">
-        @for (action of actions(); track action.id) {
-          <button
-            type="button"
-            class="palette-item hover-lift flex w-full items-center justify-between rounded-lg px-3 py-2 text-left transition hover:bg-[#ece8df]"
-            (click)="selected.emit(action.id)"
-          >
-            <span class="text-sm text-[var(--text-main)]">{{ action.label }}</span>
-            <span class="mono text-[10px] uppercase tracking-[0.12em] text-[var(--text-muted)]">{{ action.hint }}</span>
-          </button>
-        }
+      <div class="fixed inset-0 z-40 bg-black/30 backdrop-blur-sm" (click)="closed.emit()"></div>
+
+      <section class="fixed left-1/2 top-20 z-50 w-[600px] max-w-[92vw] -translate-x-1/2" (click)="$event.stopPropagation()">
+        <z-command class="overflow-hidden rounded-xl border border-border bg-popover shadow-2xl" (zCommandSelected)="onCommandSelected($event)">
+          <z-command-input placeholder="Type a command or search..." />
+          <z-command-list>
+            <z-command-empty>No matching actions.</z-command-empty>
+
+            <z-command-option-group zLabel="Actions">
+              @for (action of actions(); track action.id) {
+                <z-command-option
+                  [zValue]="action.id"
+                  [zLabel]="action.label"
+                  [zCommand]="action.label + ' ' + action.hint"
+                  [zShortcut]="action.hint"
+                />
+              }
+            </z-command-option-group>
+          </z-command-list>
+        </z-command>
       </section>
     }
   `,
@@ -33,4 +59,8 @@ export class CommandPaletteComponent {
 
   readonly selected = output<string>();
   readonly closed = output<void>();
+
+  protected onCommandSelected(option: ZardCommandOption): void {
+    this.selected.emit(String(option.value));
+  }
 }

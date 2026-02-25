@@ -1,17 +1,22 @@
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
 
+import { ZardIconComponent } from '@/shared/components/icon';
+import { ZardInputDirective } from '@/shared/components/input';
+
 @Component({
   selector: 'app-package-search-input',
+  imports: [ZardIconComponent, ZardInputDirective],
   template: `
     <label class="relative block">
+      <z-icon zType="search" class="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-muted-foreground" />
       <input
+        z-input
         type="search"
         [value]="value()"
         [placeholder]="placeholder()"
         (input)="onInput($event)"
-        class="field-ui px-3 py-2 pr-10 text-sm outline-none"
+        class="h-9 pl-9"
       />
-      <span class="pointer-events-none absolute right-3 top-2.5 mono text-xs text-[var(--text-muted)]">⌕</span>
     </label>
   `,
   changeDetection: ChangeDetectionStrategy.OnPush

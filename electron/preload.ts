@@ -9,6 +9,7 @@ import {
   brewJobProgressEventSchema,
   checkNowResultSchema,
   installOneRequestSchema,
+  uninstallOneRequestSchema,
   installedPackageSchema,
   outdatedPackageSchema,
   searchCatalogRequestSchema,
@@ -16,6 +17,9 @@ import {
   syncMetadataResultSchema,
   updatesChangedEventSchema,
   upgradeOneRequestSchema,
+  windowChromeChangedEventSchema,
+  windowChromeStateSchema,
+  windowControlActionSchema,
   type BrewGuiBridge
 } from '../src/shared/contracts';
 import { IPC_CHANNELS } from './ipc-channels';
@@ -23,6 +27,16 @@ import { IPC_CHANNELS } from './ipc-channels';
 const api: BrewGuiBridge = {
   async openMainWindow() {
     await ipcRenderer.invoke(IPC_CHANNELS.APP_OPEN_MAIN);
+  },
+
+  async windowControl(action) {
+    const parsedAction = windowControlActionSchema.parse(action);
+    await ipcRenderer.invoke(IPC_CHANNELS.APP_WINDOW_CONTROL, parsedAction);
+  },
+
+  async getWindowChromeState() {
+    const payload = await ipcRenderer.invoke(IPC_CHANNELS.APP_GET_WINDOW_CHROME);
+    return windowChromeStateSchema.parse(payload);
   },
 
   async getBrewAvailability() {
@@ -49,6 +63,12 @@ const api: BrewGuiBridge = {
   async installOne(request) {
     const parsedRequest = installOneRequestSchema.parse(request);
     const payload = await ipcRenderer.invoke(IPC_CHANNELS.INSTALL_ONE, parsedRequest);
+    return brewJobCompleteEventSchema.parse(payload);
+  },
+
+  async uninstallOne(request) {
+    const parsedRequest = uninstallOneRequestSchema.parse(request);
+    const payload = await ipcRenderer.invoke(IPC_CHANNELS.UNINSTALL_ONE, parsedRequest);
     return brewJobCompleteEventSchema.parse(payload);
   },
 
@@ -91,6 +111,15 @@ const api: BrewGuiBridge = {
 
     ipcRenderer.on(IPC_CHANNELS.EVENTS_UPDATES_CHANGED, listener);
     return () => ipcRenderer.removeListener(IPC_CHANNELS.EVENTS_UPDATES_CHANGED, listener);
+  },
+
+  onWindowChromeChanged(handler) {
+    const listener = (_event: unknown, payload: unknown) => {
+      handler(windowChromeChangedEventSchema.parse(payload));
+    };
+
+    ipcRenderer.on(IPC_CHANNELS.EVENTS_WINDOW_CHROME_CHANGED, listener);
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.EVENTS_WINDOW_CHROME_CHANGED, listener);
   },
 
   onJobProgress(handler) {

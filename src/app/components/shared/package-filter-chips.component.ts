@@ -1,5 +1,7 @@
-import { NgClass } from '@angular/common';
-import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
+import { FormsModule } from '@angular/forms';
+
+import { ZardSegmentedComponent, type SegmentedOption } from '@/shared/components/segmented/segmented.component';
 
 export interface PackageFilterOption {
   value: string;
@@ -9,23 +11,15 @@ export interface PackageFilterOption {
 
 @Component({
   selector: 'app-package-filter-chips',
-  imports: [NgClass],
+  imports: [FormsModule, ZardSegmentedComponent],
   template: `
-    <div class="flex flex-wrap gap-2">
-      @for (option of options(); track option.value) {
-        <button
-          type="button"
-          class="filter-chip px-3 py-1 text-xs mono"
-          [ngClass]="selected() === option.value ? 'filter-chip-active' : ''"
-          (click)="select(option.value)"
-        >
-          {{ option.label }}
-          @if (option.count !== undefined) {
-            <span class="ml-1">{{ option.count }}</span>
-          }
-        </button>
-      }
-    </div>
+    <z-segmented
+      zSize="sm"
+      [zOptions]="segmentedOptions()"
+      [ngModel]="selected()"
+      (ngModelChange)="select($event)"
+      zAriaLabel="Package filters"
+    />
   `,
   changeDetection: ChangeDetectionStrategy.OnPush
 })
@@ -33,6 +27,13 @@ export class PackageFilterChipsComponent {
   readonly options = input<PackageFilterOption[]>([]);
   readonly selected = input('all');
   readonly selectedChange = output<string>();
+
+  protected readonly segmentedOptions = computed<SegmentedOption[]>(() =>
+    this.options().map((option) => ({
+      value: option.value,
+      label: option.count !== undefined ? `${option.label} (${option.count})` : option.label
+    }))
+  );
 
   select(value: string): void {
     this.selectedChange.emit(value);

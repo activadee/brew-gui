@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 
 import {
+  DEFAULT_WINDOW_CHROME_STATE,
   DEFAULT_SETTINGS,
   type AppSettings,
   type AppSettingsUpdate,
@@ -12,13 +13,23 @@ import {
   type InstallOneRequest,
   type SearchCatalogRequest,
   type SearchCatalogResponse,
+  type UninstallOneRequest,
   type UpdatesChangedEvent,
-  type UpgradeOneRequest
+  type UpgradeOneRequest,
+  type WindowChromeChangedEvent,
+  type WindowChromeState,
+  type WindowControlAction
 } from '../../../shared/contracts';
 
 const createFallbackBridge = (): BrewGuiBridge => ({
   async openMainWindow() {
     return undefined;
+  },
+  async windowControl(_action: WindowControlAction) {
+    return undefined;
+  },
+  async getWindowChromeState(): Promise<WindowChromeState> {
+    return DEFAULT_WINDOW_CHROME_STATE;
   },
   async getBrewAvailability() {
     return {
@@ -46,6 +57,14 @@ const createFallbackBridge = (): BrewGuiBridge => ({
     };
   },
   async installOne(_request: InstallOneRequest): Promise<BrewJobCompleteEvent> {
+    return {
+      jobId: crypto.randomUUID(),
+      success: false,
+      output: 'Electron bridge unavailable',
+      timestamp: new Date().toISOString()
+    };
+  },
+  async uninstallOne(_request: UninstallOneRequest): Promise<BrewJobCompleteEvent> {
     return {
       jobId: crypto.randomUUID(),
       success: false,
@@ -89,6 +108,9 @@ const createFallbackBridge = (): BrewGuiBridge => ({
     return { ...DEFAULT_SETTINGS, ...update };
   },
   onUpdatesChanged(_handler: (event: UpdatesChangedEvent) => void) {
+    return () => undefined;
+  },
+  onWindowChromeChanged(_handler: (event: WindowChromeChangedEvent) => void) {
     return () => undefined;
   },
   onJobProgress(_handler: (event: BrewJobProgressEvent) => void) {

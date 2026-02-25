@@ -2,17 +2,22 @@ import { BrowserWindow, ipcMain } from 'electron';
 
 import {
   installOneRequestSchema,
+  uninstallOneRequestSchema,
   appSettingsUpdateSchema,
   checkNowResultSchema,
   searchCatalogRequestSchema,
   syncMetadataResultSchema,
   upgradeOneRequestSchema,
+  windowChromeStateSchema,
+  windowControlActionSchema,
   type AppSettings,
   type BrewJobCompleteEvent,
   type BrewJobFailedEvent,
   type BrewJobProgressEvent,
   type CheckNowResult,
-  type UpdatesChangedEvent
+  type UpdatesChangedEvent,
+  type WindowControlAction,
+  type WindowChromeState
 } from '../src/shared/contracts';
 import { IPC_CHANNELS } from './ipc-channels';
 import { HomebrewService } from './services/homebrew-service';
@@ -25,11 +30,20 @@ interface RegisterIpcOptions {
   emitUpdatesChanged: (payload: UpdatesChangedEvent) => void;
   onIntervalChanged: (settings: AppSettings) => void;
   onOpenMainWindow: () => void;
+  onWindowControl: (action: WindowControlAction) => void;
+  getWindowChromeState: () => WindowChromeState;
 }
 
 export function registerIpcHandlers(options: RegisterIpcOptions): void {
-  const { homebrew, settingsStore, emitUpdatesChanged, onIntervalChanged, onOpenMainWindow } =
-    options;
+  const {
+    homebrew,
+    settingsStore,
+    emitUpdatesChanged,
+    onIntervalChanged,
+    onOpenMainWindow,
+    onWindowControl,
+    getWindowChromeState
+  } = options;
 
   const emitJobProgress = (event: BrewJobProgressEvent): void => {
     emitRendererEvent(IPC_CHANNELS.EVENTS_JOB_PROGRESS, event);
@@ -46,6 +60,13 @@ export function registerIpcHandlers(options: RegisterIpcOptions): void {
   ipcMain.handle(IPC_CHANNELS.APP_OPEN_MAIN, async () => {
     onOpenMainWindow();
   });
+  ipcMain.handle(IPC_CHANNELS.APP_WINDOW_CONTROL, async (_event, payload) => {
+    const action = windowControlActionSchema.parse(payload);
+    onWindowControl(action);
+  });
+  ipcMain.handle(IPC_CHANNELS.APP_GET_WINDOW_CHROME, () =>
+    windowChromeStateSchema.parse(getWindowChromeState())
+  );
 
   ipcMain.handle(IPC_CHANNELS.GET_BREW_AVAILABILITY, async () => homebrew.getBrewAvailability());
   ipcMain.handle(IPC_CHANNELS.GET_INSTALLED, async () => homebrew.getInstalled());
@@ -60,6 +81,16 @@ export function registerIpcHandlers(options: RegisterIpcOptions): void {
     const parsed = installOneRequestSchema.parse(payload);
 
     return homebrew.installOne(parsed, {
+      onProgress: emitJobProgress,
+      onComplete: emitJobComplete,
+      onFailed: emitJobFailed
+    });
+  });
+
+  ipcMain.handle(IPC_CHANNELS.UNINSTALL_ONE, async (_event, payload) => {
+    const parsed = uninstallOneRequestSchema.parse(payload);
+
+    return homebrew.uninstallOne(parsed, {
       onProgress: emitJobProgress,
       onComplete: emitJobComplete,
       onFailed: emitJobFailed

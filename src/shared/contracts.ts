@@ -83,6 +83,23 @@ export const installOneRequestSchema = z.object({
 });
 export type InstallOneRequest = z.infer<typeof installOneRequestSchema>;
 
+export const uninstallOneRequestSchema = z
+  .object({
+    kind: packageKindSchema,
+    name: z.string().min(1),
+    zap: z.boolean().optional()
+  })
+  .superRefine((value, ctx) => {
+    if (value.kind === 'formula' && value.zap) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'zap is only supported for cask uninstall requests',
+        path: ['zap']
+      });
+    }
+  });
+export type UninstallOneRequest = z.infer<typeof uninstallOneRequestSchema>;
+
 export const checkNowResultSchema = z.object({
   count: z.number().int().nonnegative(),
   checkedAt: z.string()
@@ -103,6 +120,37 @@ export const brewAvailabilitySchema = z.object({
   checkedAt: z.string()
 });
 export type BrewAvailability = z.infer<typeof brewAvailabilitySchema>;
+
+export const windowControlActionSchema = z.union([
+  z.literal('close'),
+  z.literal('minimize'),
+  z.literal('toggleZoom'),
+  z.literal('toggleFullScreen')
+]);
+export type WindowControlAction = z.infer<typeof windowControlActionSchema>;
+
+export const windowPlatformSchema = z.union([
+  z.literal('darwin'),
+  z.literal('win32'),
+  z.literal('linux'),
+  z.literal('unknown')
+]);
+export type WindowPlatform = z.infer<typeof windowPlatformSchema>;
+
+export const windowChromeStateSchema = z.object({
+  platform: windowPlatformSchema,
+  isFocused: z.boolean(),
+  isMaximized: z.boolean(),
+  isFullScreen: z.boolean(),
+  canClose: z.boolean(),
+  canMinimize: z.boolean(),
+  canZoom: z.boolean(),
+  canFullScreen: z.boolean()
+});
+export type WindowChromeState = z.infer<typeof windowChromeStateSchema>;
+
+export const windowChromeChangedEventSchema = windowChromeStateSchema;
+export type WindowChromeChangedEvent = z.infer<typeof windowChromeChangedEventSchema>;
 
 export const updatesChangedEventSchema = z.object({
   count: z.number().int().nonnegative(),
@@ -147,11 +195,14 @@ export type BrewJobFailedEvent = z.infer<typeof brewJobFailedEventSchema>;
 
 export interface BrewGuiBridge {
   openMainWindow(): Promise<void>;
+  windowControl(action: WindowControlAction): Promise<void>;
+  getWindowChromeState(): Promise<WindowChromeState>;
   getBrewAvailability(): Promise<BrewAvailability>;
   getInstalled(): Promise<InstalledPackage[]>;
   getOutdated(): Promise<OutdatedPackage[]>;
   searchCatalog(request: SearchCatalogRequest): Promise<SearchCatalogResponse>;
   installOne(request: InstallOneRequest): Promise<BrewJobCompleteEvent>;
+  uninstallOne(request: UninstallOneRequest): Promise<BrewJobCompleteEvent>;
   upgradeOne(request: UpgradeOneRequest): Promise<BrewJobCompleteEvent>;
   upgradeAll(): Promise<BrewJobCompleteEvent>;
   checkNow(): Promise<CheckNowResult>;
@@ -159,6 +210,7 @@ export interface BrewGuiBridge {
   getSettings(): Promise<AppSettings>;
   updateSettings(update: AppSettingsUpdate): Promise<AppSettings>;
   onUpdatesChanged(handler: (event: UpdatesChangedEvent) => void): () => void;
+  onWindowChromeChanged(handler: (event: WindowChromeChangedEvent) => void): () => void;
   onJobProgress(handler: (event: BrewJobProgressEvent) => void): () => void;
   onJobComplete(handler: (event: BrewJobCompleteEvent) => void): () => void;
   onJobFailed(handler: (event: BrewJobFailedEvent) => void): () => void;
@@ -169,4 +221,15 @@ export const DEFAULT_SETTINGS: AppSettings = {
   autoCheckOnLaunch: true,
   trayNotifyOnUpdates: true,
   defaultView: 'updates'
+};
+
+export const DEFAULT_WINDOW_CHROME_STATE: WindowChromeState = {
+  platform: 'unknown',
+  isFocused: true,
+  isMaximized: false,
+  isFullScreen: false,
+  canClose: false,
+  canMinimize: false,
+  canZoom: false,
+  canFullScreen: false
 };

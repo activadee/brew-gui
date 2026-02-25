@@ -9,15 +9,18 @@ Brew Sidebar becomes the safest and fastest desktop control plane for Homebrew: 
 - Preserve Homebrew semantics instead of hiding important CLI behavior.
 - Make power-user workflows keyboard-first.
 
-## Phase 1: Core Package Management (Next)
-- Add install package flow:
+## Phase 1: Core Package Management (In Progress)
+- [x] Add install package flow (completed February 25, 2026):
   - Install formula or cask from Browse.
   - Confirmation modal with exact command preview.
-  - Optional flags: `--cask`, `--formula`, `--force` (advanced section).
-- Add uninstall package flow:
+  - Progress via existing command job drawer/events.
+  - Post-install refresh for Installed/Updates/Browse while staying on Browse.
+  - Advanced install flags remain deferred (`--force`, custom args).
+- [x] Add uninstall package flow (completed February 25, 2026):
   - Uninstall from Installed list.
   - Optional cask cleanup (`brew uninstall --zap`) for casks.
-  - Dependency-impact warning when relevant.
+  - Confirmation with command preview and live job output.
+  - Dependency-impact warning remains deferred to a later phase.
 - Add reinstall package flow:
   - Quick fix action for broken installs.
 - Add pin/unpin actions:
