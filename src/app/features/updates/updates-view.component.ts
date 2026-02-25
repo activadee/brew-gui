@@ -8,6 +8,7 @@ import { PackageSearchInputComponent } from '../../components/shared/package-sea
 import { UpdateSummaryCardComponent } from '../../components/ux/update-summary-card.component';
 import { UpgradeConfirmDialogComponent } from '../../components/ux/upgrade-confirm-dialog.component';
 import type { OutdatedPackage } from '../../../shared/contracts';
+import { ToastService } from '../../core/services/toast.service';
 import { UpdatesStore } from '../../core/stores/updates.store';
 
 @Component({
@@ -100,6 +101,7 @@ import { UpdatesStore } from '../../core/stores/updates.store';
 })
 export class UpdatesViewComponent {
   protected readonly updatesStore = inject(UpdatesStore);
+  private readonly toast = inject(ToastService);
 
   protected readonly filterOptions = [
     { value: 'all', label: 'All' },
@@ -154,8 +156,11 @@ export class UpdatesViewComponent {
 
   protected async confirmUpgrade(): Promise<void> {
     if (this.upgradeAllSelected()) {
-      await this.updatesStore.upgradeAll();
-      this.closeDialog();
+      const started = await this.updatesStore.upgradeAll();
+      if (started) {
+        this.toast.push('Upgrade-all command started.', 'success');
+        this.closeDialog();
+      }
       return;
     }
 
@@ -164,7 +169,10 @@ export class UpdatesViewComponent {
       return;
     }
 
-    await this.updatesStore.upgradeOne({ kind: selected.kind, name: selected.name });
-    this.closeDialog();
+    const started = await this.updatesStore.upgradeOne({ kind: selected.kind, name: selected.name });
+    if (started) {
+      this.toast.push(`Upgrade command started for ${selected.name}.`, 'success');
+      this.closeDialog();
+    }
   }
 }

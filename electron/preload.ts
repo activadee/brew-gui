@@ -8,6 +8,7 @@ import {
   brewJobFailedEventSchema,
   brewJobProgressEventSchema,
   checkNowResultSchema,
+  installOneRequestSchema,
   installedPackageSchema,
   outdatedPackageSchema,
   searchCatalogRequestSchema,
@@ -43,6 +44,12 @@ const api: BrewGuiBridge = {
     const parsedRequest = searchCatalogRequestSchema.parse(request);
     const payload = await ipcRenderer.invoke(IPC_CHANNELS.SEARCH_CATALOG, parsedRequest);
     return searchCatalogResponseSchema.parse(payload);
+  },
+
+  async installOne(request) {
+    const parsedRequest = installOneRequestSchema.parse(request);
+    const payload = await ipcRenderer.invoke(IPC_CHANNELS.INSTALL_ONE, parsedRequest);
+    return brewJobCompleteEventSchema.parse(payload);
   },
 
   async upgradeOne(request) {

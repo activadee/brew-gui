@@ -108,12 +108,13 @@ export const UpdatesStore = signalStore(
         }
       },
 
-      async upgradeOne(payload: UpgradeOneRequest): Promise<void> {
+      async upgradeOne(payload: UpgradeOneRequest): Promise<boolean> {
         patchState(store, { upgrading: true, error: null });
 
         try {
           await facade.upgradeOne(payload);
           await this.refresh();
+          return true;
         } catch (error) {
           jobsStore.markFailed({
             jobId: crypto.randomUUID(),
@@ -122,17 +123,19 @@ export const UpdatesStore = signalStore(
             timestamp: new Date().toISOString()
           });
           patchState(store, { error: (error as Error).message });
+          return false;
         } finally {
           patchState(store, { upgrading: false });
         }
       },
 
-      async upgradeAll(): Promise<void> {
+      async upgradeAll(): Promise<boolean> {
         patchState(store, { upgrading: true, error: null });
 
         try {
           await facade.upgradeAll();
           await this.refresh();
+          return true;
         } catch (error) {
           jobsStore.markFailed({
             jobId: crypto.randomUUID(),
@@ -141,6 +144,7 @@ export const UpdatesStore = signalStore(
             timestamp: new Date().toISOString()
           });
           patchState(store, { error: (error as Error).message });
+          return false;
         } finally {
           patchState(store, { upgrading: false });
         }

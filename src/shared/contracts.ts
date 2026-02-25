@@ -77,6 +77,12 @@ export const upgradeOneRequestSchema = z.object({
 });
 export type UpgradeOneRequest = z.infer<typeof upgradeOneRequestSchema>;
 
+export const installOneRequestSchema = z.object({
+  kind: packageKindSchema,
+  name: z.string().min(1)
+});
+export type InstallOneRequest = z.infer<typeof installOneRequestSchema>;
+
 export const checkNowResultSchema = z.object({
   count: z.number().int().nonnegative(),
   checkedAt: z.string()
@@ -145,6 +151,7 @@ export interface BrewGuiBridge {
   getInstalled(): Promise<InstalledPackage[]>;
   getOutdated(): Promise<OutdatedPackage[]>;
   searchCatalog(request: SearchCatalogRequest): Promise<SearchCatalogResponse>;
+  installOne(request: InstallOneRequest): Promise<BrewJobCompleteEvent>;
   upgradeOne(request: UpgradeOneRequest): Promise<BrewJobCompleteEvent>;
   upgradeAll(): Promise<BrewJobCompleteEvent>;
   checkNow(): Promise<CheckNowResult>;

@@ -8,6 +8,7 @@ import type {
   BrewJobFailedEvent,
   BrewJobProgressEvent,
   CheckNowResult,
+  InstallOneRequest,
   InstalledPackage,
   OutdatedPackage,
   SearchCatalogRequest,
@@ -42,6 +43,10 @@ export class BrewFacadeService {
 
   searchCatalog(request: SearchCatalogRequest): Promise<SearchCatalogResponse> {
     return this.bridge.api.searchCatalog(request);
+  }
+
+  installOne(request: InstallOneRequest): Promise<BrewJobCompleteEvent> {
+    return this.bridge.api.installOne(request);
   }
 
   upgradeOne(request: UpgradeOneRequest): Promise<BrewJobCompleteEvent> {

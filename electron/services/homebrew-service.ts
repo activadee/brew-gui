@@ -7,6 +7,7 @@ import type {
   BrewJobProgressEvent,
   CatalogPackage,
   CheckNowResult,
+  InstallOneRequest,
   InstalledPackage,
   OutdatedPackage,
   SearchCatalogRequest,
@@ -42,9 +43,15 @@ export interface JobEventSink {
   onFailed: (event: BrewJobFailedEvent) => void;
 }
 
+export function buildInstallCommand(request: InstallOneRequest): string[] {
+  return request.kind === 'formula'
+    ? ['install', '--formula', request.name]
+    : ['install', '--cask', request.name];
+}
+
 export class HomebrewService {
   private readonly runner = new BrewRunner();
-  private readonly upgradeQueue = new CommandQueue();
+  private readonly mutationQueue = new CommandQueue();
   private readonly catalogCache = new CatalogCache();
 
   async getBrewAvailability(): Promise<BrewAvailability> {
@@ -146,7 +153,7 @@ export class HomebrewService {
       timestamp: new Date().toISOString()
     });
 
-    return this.upgradeQueue.enqueue((signal) =>
+    return this.mutationQueue.enqueue((signal) =>
       this.runUpgradeJob(
         jobId,
         request.kind === 'formula'
@@ -158,6 +165,77 @@ export class HomebrewService {
         signal
       )
     );
+  }
+
+  async installOne(request: InstallOneRequest, sink: JobEventSink): Promise<BrewJobCompleteEvent> {
+    const jobId = randomUUID();
+    const command = buildInstallCommand(request);
+    const installTimeoutMs = 20 * 60 * 1000;
+
+    sink.onProgress({
+      jobId,
+      stage: 'queued',
+      message: `Queued install for ${request.name}`,
+      packageName: request.name,
+      kind: request.kind,
+      timestamp: new Date().toISOString()
+    });
+
+    return this.mutationQueue.enqueue(async (signal) => {
+      sink.onProgress({
+        jobId,
+        stage: 'running',
+        message: `Installing ${request.name}`,
+        packageName: request.name,
+        kind: request.kind,
+        timestamp: new Date().toISOString()
+      });
+
+      try {
+        const result = await this.runner.runText(command, {
+          signal,
+          timeoutMs: installTimeoutMs,
+          onStdout: (chunk) =>
+            sink.onProgress({
+              jobId,
+              stage: 'output',
+              message: chunk,
+              packageName: request.name,
+              kind: request.kind,
+              timestamp: new Date().toISOString()
+            }),
+          onStderr: (chunk) =>
+            sink.onProgress({
+              jobId,
+              stage: 'output',
+              message: chunk,
+              packageName: request.name,
+              kind: request.kind,
+              timestamp: new Date().toISOString()
+            })
+        });
+
+        const event: BrewJobCompleteEvent = {
+          jobId,
+          success: true,
+          output: `${result.stdout}${result.stderr}`.trim(),
+          timestamp: new Date().toISOString()
+        };
+
+        sink.onComplete(event);
+        return event;
+      } catch (error) {
+        const failed: BrewJobFailedEvent = {
+          jobId,
+          error: (error as Error).message,
+          output: '',
+          timestamp: new Date().toISOString()
+        };
+
+        sink.onFailed(failed);
+        throw error;
+      }
+    }, installTimeoutMs);
   }
 
   async upgradeAll(sink: JobEventSink): Promise<BrewJobCompleteEvent> {
@@ -172,7 +250,7 @@ export class HomebrewService {
       timestamp: new Date().toISOString()
     });
 
-    return this.upgradeQueue.enqueue(async (signal) => {
+    return this.mutationQueue.enqueue(async (signal) => {
       sink.onProgress({
         jobId,
         stage: 'running',

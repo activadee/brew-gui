@@ -9,6 +9,7 @@ describe('IPC channel allowlist', () => {
     expect(channels).toContain('brew:getInstalled');
     expect(channels).toContain('brew:getOutdated');
     expect(channels).toContain('brew:searchCatalog');
+    expect(channels).toContain('brew:installOne');
     expect(channels).toContain('brew:upgradeOne');
     expect(channels).toContain('brew:upgradeAll');
     expect(channels).toContain('brew:checkNow');

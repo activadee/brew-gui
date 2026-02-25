@@ -8,6 +8,9 @@ import { ChangeDetectionStrategy, Component, input, output } from '@angular/core
       <section class="palette-surface ui-shell-enter fixed left-1/2 top-1/2 z-50 w-[420px] max-w-[92vw] -translate-x-1/2 -translate-y-1/2 p-4">
         <h3 class="text-base font-semibold">{{ title() }}</h3>
         <p class="mt-2 text-sm text-[var(--text-muted)]">{{ message() }}</p>
+        @if (commandPreview()) {
+          <pre class="mt-3 overflow-x-auto rounded-md border border-[var(--stroke)] bg-[#f0ece3] p-2 text-[11px] mono text-[var(--text-main)]">{{ commandPreview() }}</pre>
+        }
 
         <div class="mt-4 flex justify-end gap-2">
           <button type="button" class="btn-ui btn-ui-ghost" [disabled]="busy()" (click)="cancel.emit()">
@@ -26,6 +29,7 @@ export class UpgradeConfirmDialogComponent {
   readonly open = input(false);
   readonly title = input('Confirm upgrade');
   readonly message = input('Run this operation?');
+  readonly commandPreview = input<string | null>(null);
   readonly confirmLabel = input('Run');
   readonly busy = input(false);
 

@@ -219,11 +219,10 @@ export class AppShellComponent {
       }),
       this.facade.onJobComplete((event) => {
         this.jobsStore.markComplete(event);
-        this.toast.push('Upgrade command completed.', 'success');
       }),
       this.facade.onJobFailed((event) => {
         this.jobsStore.markFailed(event);
-        this.toast.push(`Upgrade failed: ${event.error}`, 'error', 6_000);
+        this.toast.push(`Homebrew command failed: ${event.error}`, 'error', 6_000);
       })
     ];
 

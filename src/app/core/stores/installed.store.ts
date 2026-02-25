@@ -31,6 +31,7 @@ export const InstalledStore = signalStore(
     totalCount: computed(() => store.items().length),
     formulaCount: computed(() => store.items().filter((item) => item.kind === 'formula').length),
     caskCount: computed(() => store.items().filter((item) => item.kind === 'cask').length),
+    installedIdSet: computed(() => new Set(store.items().map((item) => item.id))),
     filteredItems: computed(() => {
       const query = store.query().trim().toLocaleLowerCase();
       const kindFilter = store.kindFilter();

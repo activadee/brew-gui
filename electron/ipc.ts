@@ -1,6 +1,7 @@
 import { BrowserWindow, ipcMain } from 'electron';
 
 import {
+  installOneRequestSchema,
   appSettingsUpdateSchema,
   checkNowResultSchema,
   searchCatalogRequestSchema,
@@ -53,6 +54,16 @@ export function registerIpcHandlers(options: RegisterIpcOptions): void {
   ipcMain.handle(IPC_CHANNELS.SEARCH_CATALOG, async (_event, payload) => {
     const parsed = searchCatalogRequestSchema.parse(payload);
     return homebrew.searchCatalog(parsed);
+  });
+
+  ipcMain.handle(IPC_CHANNELS.INSTALL_ONE, async (_event, payload) => {
+    const parsed = installOneRequestSchema.parse(payload);
+
+    return homebrew.installOne(parsed, {
+      onProgress: emitJobProgress,
+      onComplete: emitJobComplete,
+      onFailed: emitJobFailed
+    });
   });
 
   ipcMain.handle(IPC_CHANNELS.UPGRADE_ONE, async (_event, payload) => {
