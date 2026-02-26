@@ -9,12 +9,14 @@ import {
   type BrowserWindowConstructorOptions
 } from 'electron';
 
-import type { WindowChromeState, WindowControlAction } from '../src/shared/contracts';
+import type { CheckNowResult, WindowChromeState, WindowControlAction } from '../src/shared/contracts';
 import { IPC_CHANNELS } from './ipc-channels';
 import { registerIpcHandlers } from './ipc';
 import { configureAutoUpdate } from './services/auto-update';
-import { HomebrewService } from './services/homebrew-service';
+import { BackgroundScheduler, type UpdateCheckTrigger } from './services/background-scheduler';
+import { HomebrewService, type JobEventSink } from './services/homebrew-service';
 import { SettingsStore } from './services/settings-store';
+import { TrayAlertController } from './services/tray-alert-controller';
 import { log } from './utils/logger';
 
 const isDev = !app.isPackaged || Boolean(process.env.ELECTRON_START_URL);
@@ -23,11 +25,36 @@ const isDarwin = process.platform === 'darwin';
 let mainWindow: BrowserWindow | null = null;
 let trayWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
-let intervalHandle: NodeJS.Timeout | null = null;
 let isQuitting = false;
 
 const settingsStore = new SettingsStore();
 const homebrewService = new HomebrewService();
+const jobEventSink: JobEventSink = {
+  onProgress: (event) => {
+    emitRendererEvent(IPC_CHANNELS.EVENTS_JOB_PROGRESS, event);
+  },
+  onComplete: (event) => {
+    emitRendererEvent(IPC_CHANNELS.EVENTS_JOB_COMPLETE, event);
+  },
+  onFailed: (event) => {
+    emitRendererEvent(IPC_CHANNELS.EVENTS_JOB_FAILED, event);
+  }
+};
+
+const trayAlertController = new TrayAlertController({
+  onFlushMutedCount: (count) => {
+    applyTrayUpdateSignal(count);
+  }
+});
+
+const backgroundScheduler = new BackgroundScheduler({
+  homebrew: homebrewService,
+  settingsStore,
+  jobSink: jobEventSink,
+  onUpdateCheckResult: (result, trigger) => {
+    emitUpdatesChanged(result.count, result.checkedAt, trigger);
+  }
+});
 
 const preloadPath = path.join(__dirname, 'preload.js');
 
@@ -83,7 +110,7 @@ function createMainWindow(): BrowserWindow {
     frame: true,
     ...(isDarwin
       ? {
-	  	  titleBarStyle: 'hiddenInset' as const,
+          titleBarStyle: 'hiddenInset' as const,
           vibrancy: 'sidebar' as const,
           visualEffectState: 'followWindow' as const
         }
@@ -194,7 +221,9 @@ function createTray(): Tray {
     {
       label: 'Check for updates now',
       click: () => {
-        void runUpdateCheck();
+        void backgroundScheduler.runManualUpdateCheck().catch((error) => {
+          log.warn('Manual tray update check failed', error);
+        });
       }
     },
     {
@@ -339,42 +368,25 @@ async function loadRenderer(window: BrowserWindow, route: string): Promise<void>
   });
 }
 
-function emitUpdatesChanged(count: number, checkedAt: string): void {
+function emitUpdatesChanged(
+  count: number,
+  checkedAt: string,
+  trigger: UpdateCheckTrigger = 'manual'
+): void {
   const payload = { count, checkedAt };
 
-  for (const window of BrowserWindow.getAllWindows()) {
-    if (!window.isDestroyed()) {
-      window.webContents.send('updates:changed', payload);
-    }
+  emitRendererEvent(IPC_CHANNELS.EVENTS_UPDATES_CHANGED, payload);
+
+  if (!tray) {
+    return;
   }
 
-  if (tray) {
-    const notify = settingsStore.getSettings().trayNotifyOnUpdates;
-    tray.setToolTip(count > 0 ? `Brew Sidebar • ${count} updates available` : 'Brew Sidebar • Up to date');
-    tray.setTitle(notify && count > 0 ? `${count}` : '');
-  }
-}
-
-function refreshScheduler(): void {
-  const settings = settingsStore.getSettings();
-
-  if (intervalHandle) {
-    clearInterval(intervalHandle);
-    intervalHandle = null;
-  }
-
-  intervalHandle = setInterval(() => {
-    void runUpdateCheck();
-  }, settings.checkIntervalMinutes * 60 * 1000);
-}
-
-async function runUpdateCheck(): Promise<void> {
-  try {
-    const result = await homebrewService.checkNow();
-    settingsStore.setLastCheck(result.count, result.checkedAt);
-    emitUpdatesChanged(result.count, result.checkedAt);
-  } catch (error) {
-    log.warn('Update check failed', error);
+  const shouldMute = trayAlertController.shouldMuteUpdateSignal(
+    resolveUpdateSignalSource(trigger),
+    count
+  );
+  if (!shouldMute) {
+    applyTrayUpdateSignal(count);
   }
 }
 
@@ -382,11 +394,18 @@ function registerHandlers(): void {
   registerIpcHandlers({
     homebrew: homebrewService,
     settingsStore,
-    emitUpdatesChanged: (payload) => {
-      emitUpdatesChanged(payload.count, payload.checkedAt);
+    onSettingsChanged: (settings) => {
+      backgroundScheduler.onSettingsChanged(settings);
+      trayAlertController.updateSettings(settings);
     },
-    onIntervalChanged: () => {
-      refreshScheduler();
+    runManualUpdateCheck: async (): Promise<CheckNowResult> => {
+      return backgroundScheduler.runManualUpdateCheck();
+    },
+    runManualMetadataSync: async () => {
+      return backgroundScheduler.runManualMetadataSync();
+    },
+    runManualCleanup: async () => {
+      return backgroundScheduler.runManualCleanup();
     },
     onOpenMainWindow: () => {
       showMainWindow();
@@ -403,18 +422,18 @@ async function bootstrap(): Promise<void> {
   mainWindow = createMainWindow();
   trayWindow = createTrayWindow();
   tray = createTray();
+  const settings = settingsStore.getSettings();
+  trayAlertController.updateSettings(settings);
 
   registerHandlers();
   configureAutoUpdate();
-  refreshScheduler();
+  backgroundScheduler.start(settings);
   emitWindowChromeChanged();
 
-  const settings = settingsStore.getSettings();
-  if (settings.autoCheckOnLaunch) {
-    await runUpdateCheck();
-  } else {
+  await backgroundScheduler.runStartupCatchup();
+  if (!settings.autoCheckOnLaunch) {
     const checkedAt = settingsStore.getLastCheckedAt() ?? new Date().toISOString();
-    emitUpdatesChanged(settingsStore.getLastUpdateCount(), checkedAt);
+    emitUpdatesChanged(settingsStore.getLastUpdateCount(), checkedAt, 'startup');
   }
 }
 
@@ -434,8 +453,36 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', () => {
   isQuitting = true;
-  if (intervalHandle) {
-    clearInterval(intervalHandle);
-    intervalHandle = null;
-  }
+  backgroundScheduler.stop();
+  trayAlertController.stop();
 });
+
+function emitRendererEvent(channel: string, payload: unknown): void {
+  for (const window of BrowserWindow.getAllWindows()) {
+    if (!window.isDestroyed()) {
+      window.webContents.send(channel, payload);
+    }
+  }
+}
+
+function applyTrayUpdateSignal(count: number): void {
+  if (!tray) {
+    return;
+  }
+
+  const notify = settingsStore.getSettings().trayNotifyOnUpdates;
+  tray.setToolTip(count > 0 ? `Brew Sidebar • ${count} updates available` : 'Brew Sidebar • Up to date');
+  tray.setTitle(notify && count > 0 ? `${count}` : '');
+}
+
+function resolveUpdateSignalSource(trigger: UpdateCheckTrigger): 'manual' | 'scheduled' | 'startup' {
+  switch (trigger) {
+    case 'manual':
+      return 'manual';
+    case 'startup':
+      return 'startup';
+    case 'scheduled':
+    default:
+      return 'scheduled';
+  }
+}

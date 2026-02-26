@@ -9,7 +9,7 @@ Brew Sidebar becomes the safest and fastest desktop control plane for Homebrew: 
 - Preserve Homebrew semantics instead of hiding important CLI behavior.
 - Make power-user workflows keyboard-first.
 
-## Phase 1: Core Package Management (In Progress)
+## Phase 1: Core Package Management (Completed February 25, 2026)
 - [x] Add install package flow (completed February 25, 2026):
   - Install formula or cask from Browse.
   - Confirmation modal with exact command preview.
@@ -38,25 +38,25 @@ Brew Sidebar becomes the safest and fastest desktop control plane for Homebrew: 
   - Structured activity drawer with grouped jobs, filters, and live stage updates.
   - Full command preview, streamed output, exit code, and duration metadata.
 
-## Phase 2: Advanced Homebrew Controls
-- Tap management:
+## Phase 2: Advanced Homebrew Controls (Completed February 26, 2026)
+- [x] Tap management (completed February 26, 2026):
   - Add/remove/list taps.
   - Track tapped repos health and update status.
-- Cleanup tools:
+- [x] Cleanup tools (completed February 26, 2026):
   - Run `brew cleanup` with dry-run preview.
   - Show reclaimable disk space before confirming.
-- Services management:
+- [x] Services management (completed February 26, 2026):
   - Start/stop/restart formula services (`brew services`).
   - Service status dashboard.
-- Doctor diagnostics:
+- [x] Doctor diagnostics (completed February 26, 2026):
   - Run `brew doctor`.
   - Group findings by severity with suggested fixes.
-- Deprecated/disabled package insights:
+- [x] Deprecated/disabled package insights (completed February 26, 2026):
   - Flag deprecated/disabled installed packages.
   - Recommend replacements where available.
 
 ## Phase 3: Automation and Intelligence
-- Scheduled jobs:
+- [x] Scheduled jobs (completed February 26, 2026):
   - Scheduled update checks, cleanup, and metadata sync.
   - Quiet hours and notification windows.
 - Smart upgrade strategy:

@@ -24,7 +24,7 @@ import {
   type BrewJobFailedEvent,
   type BrewJobProgressEvent,
   type CheckNowResult,
-  type UpdatesChangedEvent,
+  type SyncMetadataResult,
   type WindowControlAction,
   type WindowChromeState
 } from '../src/shared/contracts';
@@ -36,8 +36,10 @@ import { log } from './utils/logger';
 interface RegisterIpcOptions {
   homebrew: HomebrewService;
   settingsStore: SettingsStore;
-  emitUpdatesChanged: (payload: UpdatesChangedEvent) => void;
-  onIntervalChanged: (settings: AppSettings) => void;
+  onSettingsChanged: (settings: AppSettings) => void;
+  runManualUpdateCheck: () => Promise<CheckNowResult>;
+  runManualMetadataSync: () => Promise<SyncMetadataResult>;
+  runManualCleanup: () => Promise<BrewJobCompleteEvent>;
   onOpenMainWindow: () => void;
   onWindowControl: (action: WindowControlAction) => void;
   getWindowChromeState: () => WindowChromeState;
@@ -47,8 +49,10 @@ export function registerIpcHandlers(options: RegisterIpcOptions): void {
   const {
     homebrew,
     settingsStore,
-    emitUpdatesChanged,
-    onIntervalChanged,
+    onSettingsChanged,
+    runManualUpdateCheck,
+    runManualMetadataSync,
+    runManualCleanup,
     onOpenMainWindow,
     onWindowControl,
     getWindowChromeState
@@ -204,13 +208,7 @@ export function registerIpcHandlers(options: RegisterIpcOptions): void {
     });
   });
 
-  ipcMain.handle(IPC_CHANNELS.CLEANUP_RUN, async () =>
-    homebrew.runCleanup({
-      onProgress: emitJobProgress,
-      onComplete: emitJobComplete,
-      onFailed: emitJobFailed
-    })
-  );
+  ipcMain.handle(IPC_CHANNELS.CLEANUP_RUN, async () => runManualCleanup());
 
   ipcMain.handle(IPC_CHANNELS.UPGRADE_ONE, async (_event, payload) => {
     const parsed = upgradeOneRequestSchema.parse(payload);
@@ -231,29 +229,19 @@ export function registerIpcHandlers(options: RegisterIpcOptions): void {
   );
 
   ipcMain.handle(IPC_CHANNELS.CHECK_NOW, async (): Promise<CheckNowResult> => {
-    const result = checkNowResultSchema.parse(await homebrew.checkNow());
-    settingsStore.setLastCheck(result.count, result.checkedAt);
-    emitUpdatesChanged({ count: result.count, checkedAt: result.checkedAt });
-    return result;
+    return checkNowResultSchema.parse(await runManualUpdateCheck());
   });
 
-  ipcMain.handle(IPC_CHANNELS.SYNC_METADATA, async () => {
-    const result = syncMetadataResultSchema.parse(
-      await homebrew.syncMetadata({
-        onProgress: emitJobProgress,
-        onComplete: emitJobComplete,
-        onFailed: emitJobFailed
-      })
-    );
-    return result;
-  });
+  ipcMain.handle(IPC_CHANNELS.SYNC_METADATA, async () =>
+    syncMetadataResultSchema.parse(await runManualMetadataSync())
+  );
 
   ipcMain.handle(IPC_CHANNELS.GET_SETTINGS, () => settingsStore.getSettings());
 
   ipcMain.handle(IPC_CHANNELS.UPDATE_SETTINGS, (_event, payload) => {
     const parsedUpdate = appSettingsUpdateSchema.parse(payload);
     const settings = settingsStore.updateSettings(parsedUpdate);
-    onIntervalChanged(settings);
+    onSettingsChanged(settings);
     return settings;
   });
 

@@ -12,6 +12,8 @@ interface PersistedState {
   settings: AppSettings;
   lastUpdateCount: number;
   lastCheckedAt: string | null;
+  lastMetadataSyncAt: string | null;
+  lastCleanupAt: string | null;
 }
 
 export class SettingsStore {
@@ -23,14 +25,24 @@ export class SettingsStore {
       defaults: {
         settings: DEFAULT_SETTINGS,
         lastUpdateCount: 0,
-        lastCheckedAt: null
+        lastCheckedAt: null,
+        lastMetadataSyncAt: null,
+        lastCleanupAt: null
       }
     });
   }
 
   getSettings(): AppSettings {
     const current = this.store.get('settings');
-    return appSettingsSchema.parse(current);
+    const merged = isObject(current)
+      ? {
+          ...DEFAULT_SETTINGS,
+          ...current
+        }
+      : DEFAULT_SETTINGS;
+    const parsed = appSettingsSchema.parse(merged);
+    this.store.set('settings', parsed);
+    return parsed;
   }
 
   updateSettings(update: AppSettingsUpdate): AppSettings {
@@ -53,4 +65,24 @@ export class SettingsStore {
     this.store.set('lastUpdateCount', count);
     this.store.set('lastCheckedAt', checkedAt);
   }
+
+  getLastMetadataSyncAt(): string | null {
+    return this.store.get('lastMetadataSyncAt');
+  }
+
+  setLastMetadataSyncAt(syncedAt: string): void {
+    this.store.set('lastMetadataSyncAt', syncedAt);
+  }
+
+  getLastCleanupAt(): string | null {
+    return this.store.get('lastCleanupAt');
+  }
+
+  setLastCleanupAt(cleanedAt: string): void {
+    this.store.set('lastCleanupAt', cleanedAt);
+  }
+}
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
 }

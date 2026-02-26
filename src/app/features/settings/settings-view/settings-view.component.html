@@ -31,6 +31,41 @@
 
           <z-divider zSpacing="sm" />
 
+          <div class="space-y-2">
+            <p class="text-sm font-medium">Scheduled maintenance</p>
+            <div class="space-y-2 rounded-lg border border-border/60 bg-muted/20 p-3">
+              <div class="flex items-center justify-between gap-2">
+                <z-switch formControlName="scheduledMetadataSyncEnabled">Metadata sync</z-switch>
+                <z-badge zType="outline" zShape="pill">Daily</z-badge>
+              </div>
+              <div class="flex items-center justify-between gap-2">
+                <z-switch formControlName="scheduledCleanupEnabled">Cleanup</z-switch>
+                <z-badge zType="outline" zShape="pill">Weekly</z-badge>
+              </div>
+            </div>
+          </div>
+
+          <z-divider zSpacing="sm" />
+
+          <div class="space-y-2">
+            <z-switch formControlName="quietHoursEnabled">Mute scheduled tray alerts during quiet hours</z-switch>
+            @if (form.controls.quietHoursEnabled.value) {
+              <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <label class="space-y-1 text-sm">
+                  <span class="text-muted-foreground">Start</span>
+                  <input z-input type="time" formControlName="quietHoursStart" />
+                </label>
+                <label class="space-y-1 text-sm">
+                  <span class="text-muted-foreground">End</span>
+                  <input z-input type="time" formControlName="quietHoursEnd" />
+                </label>
+              </div>
+            }
+            <p class="text-xs text-muted-foreground">Scheduled jobs still run; only tray alerts are muted.</p>
+          </div>
+
+          <z-divider zSpacing="sm" />
+
           <div class="space-y-1.5">
             <p class="text-sm font-medium">Default view</p>
             <z-segmented

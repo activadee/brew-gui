@@ -5,6 +5,7 @@ import { ZardBadgeComponent } from '@/shared/components/badge';
 import { ZardButtonComponent } from '@/shared/components/button';
 import { ZardCardComponent } from '@/shared/components/card';
 import { ZardDividerComponent } from '@/shared/components/divider';
+import { ZardInputDirective } from '@/shared/components/input';
 import { ZardSegmentedComponent, type SegmentedOption } from '@/shared/components/segmented';
 import { ZardSwitchComponent } from '@/shared/components/switch';
 import { SettingsStore } from '../../../core/stores/settings.store';
@@ -17,6 +18,7 @@ import { SettingsStore } from '../../../core/stores/settings.store';
     ZardButtonComponent,
     ZardBadgeComponent,
     ZardDividerComponent,
+    ZardInputDirective,
     ZardSegmentedComponent,
     ZardSwitchComponent
   ],
@@ -45,6 +47,11 @@ export class SettingsViewComponent {
     checkIntervalMinutes: '360' as '60' | '360' | '1440',
     autoCheckOnLaunch: true,
     trayNotifyOnUpdates: true,
+    scheduledMetadataSyncEnabled: true,
+    scheduledCleanupEnabled: false,
+    quietHoursEnabled: false,
+    quietHoursStart: '22:00',
+    quietHoursEnd: '07:00',
     defaultView: 'updates' as 'updates' | 'installed' | 'browse'
   });
 
@@ -56,6 +63,11 @@ export class SettingsViewComponent {
           checkIntervalMinutes: String(settings.checkIntervalMinutes) as '60' | '360' | '1440',
           autoCheckOnLaunch: settings.autoCheckOnLaunch,
           trayNotifyOnUpdates: settings.trayNotifyOnUpdates,
+          scheduledMetadataSyncEnabled: settings.scheduledMetadataSyncEnabled,
+          scheduledCleanupEnabled: settings.scheduledCleanupEnabled,
+          quietHoursEnabled: settings.quietHoursEnabled,
+          quietHoursStart: settings.quietHoursStart,
+          quietHoursEnd: settings.quietHoursEnd,
           defaultView: settings.defaultView
         },
         { emitEvent: false }
@@ -69,6 +81,11 @@ export class SettingsViewComponent {
       checkIntervalMinutes: Number(value.checkIntervalMinutes) as 60 | 360 | 1440,
       autoCheckOnLaunch: value.autoCheckOnLaunch,
       trayNotifyOnUpdates: value.trayNotifyOnUpdates,
+      scheduledMetadataSyncEnabled: value.scheduledMetadataSyncEnabled,
+      scheduledCleanupEnabled: value.scheduledCleanupEnabled,
+      quietHoursEnabled: value.quietHoursEnabled,
+      quietHoursStart: value.quietHoursStart,
+      quietHoursEnd: value.quietHoursEnd,
       defaultView: value.defaultView
     });
   }
@@ -79,6 +96,11 @@ export class SettingsViewComponent {
       checkIntervalMinutes: String(settings.checkIntervalMinutes) as '60' | '360' | '1440',
       autoCheckOnLaunch: settings.autoCheckOnLaunch,
       trayNotifyOnUpdates: settings.trayNotifyOnUpdates,
+      scheduledMetadataSyncEnabled: settings.scheduledMetadataSyncEnabled,
+      scheduledCleanupEnabled: settings.scheduledCleanupEnabled,
+      quietHoursEnabled: settings.quietHoursEnabled,
+      quietHoursStart: settings.quietHoursStart,
+      quietHoursEnd: settings.quietHoursEnd,
       defaultView: settings.defaultView
     });
   }

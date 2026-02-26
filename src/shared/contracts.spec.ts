@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  DEFAULT_SETTINGS,
+  appSettingsSchema,
   brewDoctorFindingSchema,
   brewDoctorResultSchema,
   brewJobCompleteEventSchema,
@@ -11,6 +13,7 @@ import {
   cleanupPreviewResultSchema,
   packageDetailsRequestSchema,
   packageDetailsSchema,
+  quietHoursTimeSchema,
   serviceRequestSchema,
   tapAddRequestSchema,
   tapRemoveRequestSchema,
@@ -61,6 +64,32 @@ describe('window chrome contracts', () => {
     });
 
     expect(result.success).toBe(false);
+  });
+
+  it('parses app settings payloads with scheduled jobs and quiet hours', () => {
+    const parsed = appSettingsSchema.parse({
+      ...DEFAULT_SETTINGS,
+      scheduledCleanupEnabled: true,
+      quietHoursEnabled: true,
+      quietHoursStart: '21:30',
+      quietHoursEnd: '06:15'
+    });
+
+    expect(parsed.scheduledMetadataSyncEnabled).toBe(true);
+    expect(parsed.scheduledCleanupEnabled).toBe(true);
+    expect(parsed.quietHoursStart).toBe('21:30');
+    expect(parsed.quietHoursEnd).toBe('06:15');
+  });
+
+  it('rejects invalid quiet-hours times', () => {
+    expect(quietHoursTimeSchema.safeParse('24:00').success).toBe(false);
+    expect(quietHoursTimeSchema.safeParse('7:00').success).toBe(false);
+    expect(
+      appSettingsSchema.safeParse({
+        ...DEFAULT_SETTINGS,
+        quietHoursStart: '25:15'
+      }).success
+    ).toBe(false);
   });
 
   it('parses package details payloads', () => {

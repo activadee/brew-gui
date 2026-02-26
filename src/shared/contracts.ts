@@ -134,10 +134,19 @@ export const serviceRequestSchema = z.object({
 });
 export type ServiceRequest = z.infer<typeof serviceRequestSchema>;
 
+export const quietHoursTimeSchema = z
+  .string()
+  .regex(/^([01]\d|2[0-3]):([0-5]\d)$/, 'time must match HH:mm');
+
 export const appSettingsSchema = z.object({
   checkIntervalMinutes: z.union([z.literal(60), z.literal(360), z.literal(1440)]),
   autoCheckOnLaunch: z.boolean(),
   trayNotifyOnUpdates: z.boolean(),
+  scheduledMetadataSyncEnabled: z.boolean(),
+  scheduledCleanupEnabled: z.boolean(),
+  quietHoursEnabled: z.boolean(),
+  quietHoursStart: quietHoursTimeSchema,
+  quietHoursEnd: quietHoursTimeSchema,
   defaultView: z.union([z.literal('updates'), z.literal('installed'), z.literal('browse')])
 });
 export type AppSettings = z.infer<typeof appSettingsSchema>;
@@ -516,6 +525,11 @@ export const DEFAULT_SETTINGS: AppSettings = {
   checkIntervalMinutes: 360,
   autoCheckOnLaunch: true,
   trayNotifyOnUpdates: true,
+  scheduledMetadataSyncEnabled: true,
+  scheduledCleanupEnabled: false,
+  quietHoursEnabled: false,
+  quietHoursStart: '22:00',
+  quietHoursEnd: '07:00',
   defaultView: 'updates'
 };
 
