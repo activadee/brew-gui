@@ -32,6 +32,11 @@ import type {
   ReinstallOneRequest,
   SearchCatalogRequest,
   SearchCatalogResponse,
+  SmartUpgradeBlockedPackage,
+  SmartUpgradePlan,
+  SmartUpgradePlanItem,
+  SmartUpgradeRiskLevel,
+  SmartUpgradeRunRequest,
   SyncMetadataResult,
   TapAddRequest,
   TapRemoveRequest,
@@ -51,6 +56,10 @@ import {
   type BrewInfoResponse,
   type BrewOutdatedResponse
 } from './homebrew-normalizer';
+import {
+  buildSmartUpgradeBlockedKey,
+  buildSmartUpgradePlan
+} from './smart-upgrade-planner';
 import { BrewCommandError, BrewRunner } from './brew-runner';
 
 const CATALOG_TTL_MS = 24 * 60 * 60 * 1000;
@@ -299,6 +308,17 @@ export class HomebrewService {
       count: outdated.length,
       checkedAt: new Date().toISOString()
     };
+  }
+
+  async getSmartUpgradePlan(
+    blockedPackages: SmartUpgradeBlockedPackage[]
+  ): Promise<SmartUpgradePlan> {
+    const outdated = await this.getOutdated();
+    const blockedKeys = new Set(
+      blockedPackages.map((pkg) => buildSmartUpgradeBlockedKey(pkg))
+    );
+
+    return buildSmartUpgradePlan(outdated, blockedKeys);
   }
 
   async syncMetadata(sink?: JobEventSink): Promise<SyncMetadataResult> {
@@ -774,6 +794,222 @@ export class HomebrewService {
         }
       },
       DOCTOR_RUN_TIMEOUT_MS
+    );
+  }
+
+  async upgradeSmart(
+    request: SmartUpgradeRunRequest,
+    blockedPackages: SmartUpgradeBlockedPackage[],
+    sink: JobEventSink
+  ): Promise<BrewJobCompleteEvent> {
+    const blockedKeys = new Set(
+      blockedPackages.map((pkg) => buildSmartUpgradeBlockedKey(pkg))
+    );
+    const selectedRiskSet = new Set(request.risks);
+
+    const jobId = randomUUID();
+    const action: BrewJobAction = 'upgradeSmart';
+    const target: TrackedJobTarget = { packageName: null, kind: 'system' };
+    const commandText = `brew smart-upgrade --risks ${request.risks.join(',')}`;
+    const startedAt = Date.now();
+
+    this.emitProgress({
+      sink,
+      jobId,
+      action,
+      command: commandText,
+      stage: 'queued',
+      stream: 'system',
+      target,
+      message: `Queued smart upgrade for risk levels: ${request.risks.join(', ')}`
+    });
+
+    return this.mutationQueue.enqueue(
+      async (signal) => {
+        const plan = buildSmartUpgradePlan(await this.getOutdated(), blockedKeys);
+        const riskBatches: Array<{ risk: SmartUpgradeRiskLevel; items: SmartUpgradePlanItem[] }> = [
+          { risk: 'low', items: plan.low },
+          { risk: 'medium', items: plan.medium },
+          { risk: 'high', items: plan.high }
+        ];
+        const selectedBatches = riskBatches.filter((batch) => selectedRiskSet.has(batch.risk));
+        const selectedItems = selectedBatches.flatMap((batch) => batch.items);
+        let combinedOutput = '';
+        const succeeded: SmartUpgradePlanItem[] = [];
+        const failures: Array<{
+          item: SmartUpgradePlanItem;
+          exitCode: number;
+          message: string;
+          output: string;
+        }> = [];
+
+        this.emitProgress({
+          sink,
+          jobId,
+          action,
+          command: commandText,
+          stage: 'running',
+          stream: 'system',
+          target,
+          message: `Running smart upgrade across ${selectedBatches.length} risk batch(es)`
+        });
+
+        if (selectedItems.length === 0) {
+          const output = 'No eligible packages match the selected smart-upgrade risk levels.';
+          const complete = this.buildCompleteEvent({
+            jobId,
+            action,
+            command: commandText,
+            target,
+            startedAt,
+            output,
+            exitCode: 0
+          });
+          sink.onComplete(complete);
+          return complete;
+        }
+
+        for (const batch of selectedBatches) {
+          if (batch.items.length === 0) {
+            continue;
+          }
+
+          this.emitProgress({
+            sink,
+            jobId,
+            action,
+            command: commandText,
+            stage: 'output',
+            stream: 'system',
+            target,
+            message: `Starting ${batch.risk} risk batch (${batch.items.length} package(s))`
+          });
+
+          for (const item of batch.items) {
+            const packageCommand = item.kind === 'formula'
+              ? ['upgrade', '--formula', item.name]
+              : ['upgrade', '--cask', item.name];
+            const packageCommandText = `brew ${packageCommand.join(' ')}`;
+            const packageTarget: TrackedJobTarget = {
+              packageName: item.name,
+              kind: item.kind
+            };
+
+            this.emitProgress({
+              sink,
+              jobId,
+              action,
+              command: commandText,
+              stage: 'output',
+              stream: 'system',
+              target: packageTarget,
+              message: `Upgrading ${item.kind} ${item.name} (${batch.risk} risk)`
+            });
+
+            try {
+              const result = await this.runner.runText(packageCommand, {
+                signal,
+                timeoutMs: 20 * 60 * 1000,
+                onStdout: (chunk) => {
+                  this.emitProgress({
+                    sink,
+                    jobId,
+                    action,
+                    command: commandText,
+                    stage: 'output',
+                    stream: 'stdout',
+                    target: packageTarget,
+                    message: chunk
+                  });
+                },
+                onStderr: (chunk) => {
+                  this.emitProgress({
+                    sink,
+                    jobId,
+                    action,
+                    command: commandText,
+                    stage: 'output',
+                    stream: 'stderr',
+                    target: packageTarget,
+                    message: chunk
+                  });
+                }
+              });
+
+              combinedOutput += `${result.stdout}${result.stderr}`;
+              succeeded.push(item);
+            } catch (error) {
+              const structured = this.extractStructuredError(error, packageCommandText, '');
+              if (structured.output) {
+                combinedOutput += `${structured.output}\n`;
+              }
+
+              failures.push({
+                item,
+                exitCode: structured.exitCode,
+                message: structured.message,
+                output: structured.output
+              });
+
+              this.emitProgress({
+                sink,
+                jobId,
+                action,
+                command: commandText,
+                stage: 'output',
+                stream: 'system',
+                target: packageTarget,
+                message: `Failed ${item.name} (exit ${structured.exitCode}): ${structured.message}`
+              });
+            } finally {
+              this.invalidateDetailsCacheEntry(item.kind, item.name);
+            }
+          }
+        }
+
+        if (failures.length > 0) {
+          const summary = [
+            `Smart upgrade finished with ${failures.length} failure(s) out of ${selectedItems.length} package(s).`,
+            ...failures.map(
+              (failure) =>
+                `- ${failure.item.kind}:${failure.item.name} (exit ${failure.exitCode}) ${failure.message}`
+            )
+          ].join('\n');
+          const output = [combinedOutput.trim(), summary].filter(Boolean).join('\n\n');
+          const failed = this.buildFailedEvent({
+            jobId,
+            action,
+            command: commandText,
+            target,
+            startedAt,
+            error: `Smart upgrade completed with failures (${failures.length}/${selectedItems.length}).`,
+            output,
+            exitCode: failures[0]?.exitCode ?? 1
+          });
+          sink.onFailed(failed);
+          throw new Error(failed.error);
+        }
+
+        const output = [
+          combinedOutput.trim(),
+          `Smart upgrade completed successfully for ${succeeded.length} package(s).`
+        ]
+          .filter(Boolean)
+          .join('\n\n');
+
+        const complete = this.buildCompleteEvent({
+          jobId,
+          action,
+          command: commandText,
+          target,
+          startedAt,
+          output,
+          exitCode: 0
+        });
+        sink.onComplete(complete);
+        return complete;
+      },
+      60 * 60 * 1000
     );
   }
 

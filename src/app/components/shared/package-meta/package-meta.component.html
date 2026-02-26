@@ -4,6 +4,9 @@
       @if (pinned()) {
         <z-badge zType="secondary" zShape="pill" class="mono text-[10px] uppercase">pinned</z-badge>
       }
+      @if (smartUpgradeBlocked()) {
+        <z-badge zType="outline" zShape="pill" class="mono text-[10px] uppercase">smart-blocked</z-badge>
+      }
       @if (disabled()) {
         <z-badge zType="destructive" zShape="pill" class="mono text-[10px] uppercase">disabled</z-badge>
       } @else if (deprecated()) {

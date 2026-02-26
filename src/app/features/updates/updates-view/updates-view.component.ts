@@ -1,13 +1,14 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 
 import { ZardButtonComponent } from '@/shared/components/button';
-import type { OutdatedPackage } from '../../../../shared/contracts';
+import type { OutdatedPackage, SmartUpgradePlan, SmartUpgradeRiskLevel } from '../../../../shared/contracts';
 import { EmptyStateComponent } from '../../../components/foundation/empty-state/empty-state.component';
 import { LoadingStateComponent } from '../../../components/foundation/loading-state/loading-state.component';
 import { PackageFilterChipsComponent } from '../../../components/shared/package-filter-chips/package-filter-chips.component';
 import type { PackageRowOverflowAction } from '../../../components/shared/package-row-overflow-menu/package-row-overflow-menu.component';
 import { PackageRowComponent } from '../../../components/shared/package-row/package-row.component';
 import { PackageSearchInputComponent } from '../../../components/shared/package-search-input/package-search-input.component';
+import { SmartUpgradeDialogComponent } from '../../../components/ux/smart-upgrade-dialog/smart-upgrade-dialog.component';
 import { UpdateSummaryCardComponent } from '../../../components/ux/update-summary-card/update-summary-card.component';
 import { UpgradeConfirmDialogComponent } from '../../../components/ux/upgrade-confirm-dialog/upgrade-confirm-dialog.component';
 import { ToastService } from '../../../core/services/toast.service';
@@ -24,6 +25,7 @@ import { UpdatesStore } from '../../../core/stores/updates.store';
     PackageFilterChipsComponent,
     PackageRowComponent,
     PackageSearchInputComponent,
+    SmartUpgradeDialogComponent,
     UpdateSummaryCardComponent,
     UpgradeConfirmDialogComponent
   ],
@@ -47,7 +49,14 @@ export class UpdatesViewComponent {
     { value: 'pinned', label: 'Pinned', count: this.updatesStore.pinnedCount() },
     { value: 'unpinned', label: 'Unpinned', count: this.updatesStore.unpinnedCount() }
   ]);
-  protected readonly actionBusy = computed(() => this.updatesStore.upgrading() || this.updatesStore.pinning());
+  protected readonly actionBusy = computed(
+    () =>
+      this.updatesStore.upgrading()
+      || this.updatesStore.pinning()
+      || this.updatesStore.smartPlanning()
+      || this.updatesStore.smartRunning()
+  );
+  protected readonly smartRiskOptions: SmartUpgradeRiskLevel[] = ['low', 'medium', 'high'];
 
   protected onFilterChange(value: string): void {
     this.updatesStore.setKindFilter(value as 'all' | 'formula' | 'cask');
@@ -59,6 +68,8 @@ export class UpdatesViewComponent {
 
   private readonly selectedPackage = signal<OutdatedPackage | null>(null);
   private readonly upgradeAllSelected = signal(false);
+  private readonly smartDialogOpen = signal(false);
+  protected readonly selectedSmartRisks = signal<SmartUpgradeRiskLevel[]>([]);
 
   protected readonly confirmOpen = computed(
     () => Boolean(this.selectedPackage()) || this.upgradeAllSelected()
@@ -97,12 +108,19 @@ export class UpdatesViewComponent {
 
   protected overflowActionsFor(item: OutdatedPackage): PackageRowOverflowAction[] {
     const busy = this.actionBusy();
+    const blocked = this.smartUpgradeBlocked(item);
+    const smartToggleAction: PackageRowOverflowAction = {
+      id: 'toggle-smart-upgrade',
+      label: blocked ? 'Allow smart upgrade' : 'Exclude from smart upgrade',
+      disabled: busy
+    };
     if (item.kind === 'cask') {
       return [
         {
           id: 'view-details',
           label: 'View details'
         },
+        smartToggleAction,
         {
           id: 'pin-not-supported',
           label: 'Pin not supported for casks',
@@ -114,10 +132,12 @@ export class UpdatesViewComponent {
     return item.pinned
       ? [
           { id: 'view-details', label: 'View details' },
+          smartToggleAction,
           { id: 'unpin', label: 'Unpin formula', disabled: busy }
         ]
       : [
           { id: 'view-details', label: 'View details' },
+          smartToggleAction,
           { id: 'pin', label: 'Pin formula', disabled: busy }
         ];
   }
@@ -140,9 +160,49 @@ export class UpdatesViewComponent {
     this.upgradeAllSelected.set(true);
   }
 
+  protected async openSmartUpgrade(): Promise<void> {
+    if (this.actionBusy()) {
+      return;
+    }
+
+    this.smartDialogOpen.set(true);
+    const plan = await this.updatesStore.loadSmartUpgradePlan();
+    if (!plan) {
+      this.selectedSmartRisks.set([]);
+      return;
+    }
+
+    this.selectedSmartRisks.set(this.defaultSelectedRisks(plan));
+  }
+
   protected closeDialog(): void {
     this.selectedPackage.set(null);
     this.upgradeAllSelected.set(false);
+  }
+
+  protected closeSmartUpgradeDialog(): void {
+    if (this.updatesStore.smartRunning()) {
+      return;
+    }
+
+    this.smartDialogOpen.set(false);
+    this.selectedSmartRisks.set([]);
+  }
+
+  protected onSmartRisksChange(risks: SmartUpgradeRiskLevel[]): void {
+    this.selectedSmartRisks.set(risks);
+  }
+
+  protected async confirmSmartUpgrade(): Promise<void> {
+    if (this.selectedSmartRisks().length === 0) {
+      return;
+    }
+
+    const started = await this.updatesStore.upgradeSmart(this.selectedSmartRisks());
+    if (started) {
+      this.toast.push('Smart upgrade completed.', 'success');
+      this.closeSmartUpgradeDialog();
+    }
   }
 
   protected async confirmUpgrade(): Promise<void> {
@@ -173,7 +233,28 @@ export class UpdatesViewComponent {
       return;
     }
 
-    if (this.actionBusy() || item.kind !== 'formula') {
+    if (this.actionBusy()) {
+      return;
+    }
+
+    if (action === 'toggle-smart-upgrade') {
+      const currentlyBlocked = this.updatesStore.isSmartUpgradeBlocked(item.kind, item.name);
+      const updated = await this.updatesStore.toggleSmartUpgradeBlocked({
+        kind: item.kind,
+        name: item.name
+      });
+      if (updated) {
+        this.toast.push(
+          currentlyBlocked
+            ? `Allowed ${item.name} for smart upgrades.`
+            : `Excluded ${item.name} from smart upgrades.`,
+          'success'
+        );
+      }
+      return;
+    }
+
+    if (item.kind !== 'formula') {
       return;
     }
 
@@ -197,5 +278,17 @@ export class UpdatesViewComponent {
 
   private canUpgrade(item: OutdatedPackage): boolean {
     return !(item.kind === 'formula' && item.pinned);
+  }
+
+  protected smartUpgradeBlocked(item: OutdatedPackage): boolean {
+    return this.updatesStore.isSmartUpgradeBlocked(item.kind, item.name);
+  }
+
+  protected smartDialogIsOpen(): boolean {
+    return this.smartDialogOpen();
+  }
+
+  private defaultSelectedRisks(plan: SmartUpgradePlan): SmartUpgradeRiskLevel[] {
+    return this.smartRiskOptions.filter((risk) => plan.totals[risk] > 0);
   }
 }

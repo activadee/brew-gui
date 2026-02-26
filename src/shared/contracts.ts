@@ -37,6 +37,54 @@ export const outdatedPackageSchema = z.object({
 });
 export type OutdatedPackage = z.infer<typeof outdatedPackageSchema>;
 
+export const smartUpgradeRiskLevelSchema = z.union([
+  z.literal('low'),
+  z.literal('medium'),
+  z.literal('high')
+]);
+export type SmartUpgradeRiskLevel = z.infer<typeof smartUpgradeRiskLevelSchema>;
+
+export const smartUpgradeBlockedPackageSchema = z.object({
+  kind: packageKindSchema,
+  name: z.string().min(1)
+});
+export type SmartUpgradeBlockedPackage = z.infer<typeof smartUpgradeBlockedPackageSchema>;
+
+export const smartUpgradePlanItemSchema = z.object({
+  id: z.string(),
+  kind: packageKindSchema,
+  name: z.string(),
+  installedVersion: z.string(),
+  currentVersion: z.string(),
+  risk: smartUpgradeRiskLevelSchema,
+  reason: z.string().min(1)
+});
+export type SmartUpgradePlanItem = z.infer<typeof smartUpgradePlanItemSchema>;
+
+export const smartUpgradePlanSchema = z.object({
+  generatedAt: z.string(),
+  low: z.array(smartUpgradePlanItemSchema),
+  medium: z.array(smartUpgradePlanItemSchema),
+  high: z.array(smartUpgradePlanItemSchema),
+  excludedPinned: z.array(smartUpgradePlanItemSchema),
+  excludedBlocked: z.array(smartUpgradePlanItemSchema),
+  totals: z.object({
+    outdated: z.number().int().nonnegative(),
+    eligible: z.number().int().nonnegative(),
+    low: z.number().int().nonnegative(),
+    medium: z.number().int().nonnegative(),
+    high: z.number().int().nonnegative(),
+    excludedPinned: z.number().int().nonnegative(),
+    excludedBlocked: z.number().int().nonnegative()
+  })
+});
+export type SmartUpgradePlan = z.infer<typeof smartUpgradePlanSchema>;
+
+export const smartUpgradeRunRequestSchema = z.object({
+  risks: z.array(smartUpgradeRiskLevelSchema).min(1)
+});
+export type SmartUpgradeRunRequest = z.infer<typeof smartUpgradeRunRequestSchema>;
+
 export const catalogPackageSchema = z.object({
   id: z.string(),
   kind: packageKindSchema,
@@ -142,6 +190,7 @@ export const appSettingsSchema = z.object({
   checkIntervalMinutes: z.union([z.literal(60), z.literal(360), z.literal(1440)]),
   autoCheckOnLaunch: z.boolean(),
   trayNotifyOnUpdates: z.boolean(),
+  smartUpgradeBlockedPackages: z.array(smartUpgradeBlockedPackageSchema),
   scheduledMetadataSyncEnabled: z.boolean(),
   scheduledCleanupEnabled: z.boolean(),
   quietHoursEnabled: z.boolean(),
@@ -408,6 +457,7 @@ export const brewJobActionSchema = z.union([
   z.literal('reinstall'),
   z.literal('upgradeOne'),
   z.literal('upgradeAll'),
+  z.literal('upgradeSmart'),
   z.literal('cleanup'),
   z.literal('doctor'),
   z.literal('pin'),
@@ -509,6 +559,8 @@ export interface BrewGuiBridge {
   serviceRestart(request: ServiceRequest): Promise<BrewJobCompleteEvent>;
   upgradeOne(request: UpgradeOneRequest): Promise<BrewJobCompleteEvent>;
   upgradeAll(): Promise<BrewJobCompleteEvent>;
+  getSmartUpgradePlan(): Promise<SmartUpgradePlan>;
+  upgradeSmart(request: SmartUpgradeRunRequest): Promise<BrewJobCompleteEvent>;
   runCleanup(): Promise<BrewJobCompleteEvent>;
   checkNow(): Promise<CheckNowResult>;
   syncMetadata(): Promise<SyncMetadataResult>;
@@ -525,6 +577,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   checkIntervalMinutes: 360,
   autoCheckOnLaunch: true,
   trayNotifyOnUpdates: true,
+  smartUpgradeBlockedPackages: [],
   scheduledMetadataSyncEnabled: true,
   scheduledCleanupEnabled: false,
   quietHoursEnabled: false,

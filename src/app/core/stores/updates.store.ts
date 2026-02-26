@@ -5,6 +5,9 @@ import type {
   OutdatedPackage,
   PackageKind,
   PinOneRequest,
+  SmartUpgradeBlockedPackage,
+  SmartUpgradePlan,
+  SmartUpgradeRiskLevel,
   UnpinOneRequest,
   UpdatesChangedEvent,
   UpgradeOneRequest
@@ -24,6 +27,10 @@ interface UpdatesState {
   lastCheckedAt: string | null;
   upgrading: boolean;
   pinning: boolean;
+  smartPlan: SmartUpgradePlan | null;
+  smartPlanning: boolean;
+  smartRunning: boolean;
+  blockedPackages: SmartUpgradeBlockedPackage[];
 }
 
 const initialState: UpdatesState = {
@@ -35,7 +42,11 @@ const initialState: UpdatesState = {
   pinFilter: 'all',
   lastCheckedAt: null,
   upgrading: false,
-  pinning: false
+  pinning: false,
+  smartPlan: null,
+  smartPlanning: false,
+  smartRunning: false,
+  blockedPackages: []
 };
 
 export const UpdatesStore = signalStore(
@@ -45,6 +56,13 @@ export const UpdatesStore = signalStore(
     updateCount: computed(() => store.items().length),
     pinnedCount: computed(() => store.items().filter((item) => item.pinned).length),
     unpinnedCount: computed(() => store.items().filter((item) => !item.pinned).length),
+    hasSmartEligibleItems: computed(
+      () =>
+        Boolean(
+          store.smartPlan()
+          && (store.smartPlan()!.totals.low > 0 || store.smartPlan()!.totals.medium > 0 || store.smartPlan()!.totals.high > 0)
+        )
+    ),
     filteredItems: computed(() => {
       const query = store.query().trim().toLocaleLowerCase();
       const kindFilter = store.kindFilter();
@@ -91,15 +109,20 @@ export const UpdatesStore = signalStore(
         patchState(store, { lastCheckedAt: event.checkedAt });
       },
 
+      isSmartUpgradeBlocked(kind: PackageKind, name: string): boolean {
+        return store.blockedPackages().some((pkg) => pkg.kind === kind && pkg.name === name);
+      },
+
       async refresh(): Promise<void> {
         patchState(store, { loading: true, error: null });
 
         try {
-          const items = await facade.getOutdated();
+          const [items, settings] = await Promise.all([facade.getOutdated(), facade.getSettings()]);
           patchState(store, {
             items,
             loading: false,
-            lastCheckedAt: new Date().toISOString()
+            lastCheckedAt: new Date().toISOString(),
+            blockedPackages: settings.smartUpgradeBlockedPackages
           });
         } catch (error) {
           patchState(store, {
@@ -114,12 +137,13 @@ export const UpdatesStore = signalStore(
 
         try {
           const result = await facade.checkNow();
-          const items = await facade.getOutdated();
+          const [items, settings] = await Promise.all([facade.getOutdated(), facade.getSettings()]);
 
           patchState(store, {
             items,
             loading: false,
-            lastCheckedAt: result.checkedAt
+            lastCheckedAt: result.checkedAt,
+            blockedPackages: settings.smartUpgradeBlockedPackages
           });
         } catch (error) {
           patchState(store, {
@@ -156,6 +180,82 @@ export const UpdatesStore = signalStore(
           return false;
         } finally {
           patchState(store, { upgrading: false });
+        }
+      },
+
+      async loadSmartUpgradePlan(): Promise<SmartUpgradePlan | null> {
+        patchState(store, { smartPlanning: true, error: null });
+
+        try {
+          const [plan, settings] = await Promise.all([
+            facade.getSmartUpgradePlan(),
+            facade.getSettings()
+          ]);
+          patchState(store, {
+            smartPlan: plan,
+            smartPlanning: false,
+            blockedPackages: settings.smartUpgradeBlockedPackages
+          });
+          return plan;
+        } catch (error) {
+          patchState(store, {
+            smartPlanning: false,
+            error: (error as Error).message
+          });
+          return null;
+        }
+      },
+
+      async upgradeSmart(risks: SmartUpgradeRiskLevel[]): Promise<boolean> {
+        patchState(store, { smartRunning: true, error: null });
+
+        try {
+          await facade.upgradeSmart({ risks });
+          await this.refresh();
+          await this.loadSmartUpgradePlan();
+          return true;
+        } catch (error) {
+          patchState(store, { error: (error as Error).message });
+          await this.loadSmartUpgradePlan();
+          return false;
+        } finally {
+          patchState(store, { smartRunning: false });
+        }
+      },
+
+      async toggleSmartUpgradeBlocked(payload: UpgradeOneRequest): Promise<boolean> {
+        patchState(store, { smartPlanning: true, error: null });
+
+        try {
+          const settings = await facade.getSettings();
+          const blocked = [...settings.smartUpgradeBlockedPackages];
+          const existingIndex = blocked.findIndex(
+            (pkg) => pkg.kind === payload.kind && pkg.name === payload.name
+          );
+
+          if (existingIndex >= 0) {
+            blocked.splice(existingIndex, 1);
+          } else {
+            blocked.push({
+              kind: payload.kind,
+              name: payload.name
+            });
+          }
+
+          const updated = await facade.updateSettings({
+            smartUpgradeBlockedPackages: blocked
+          });
+
+          patchState(store, {
+            blockedPackages: updated.smartUpgradeBlockedPackages
+          });
+          await this.loadSmartUpgradePlan();
+          return true;
+        } catch (error) {
+          patchState(store, { error: (error as Error).message });
+          return false;
+        } finally {
+          patchState(store, { smartPlanning: false });
         }
       },
 

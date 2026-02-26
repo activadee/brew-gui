@@ -29,6 +29,8 @@ describe('IPC channel allowlist', () => {
     expect(channels).toContain('brew:doctorRun');
     expect(channels).toContain('brew:upgradeOne');
     expect(channels).toContain('brew:upgradeAll');
+    expect(channels).toContain('brew:getSmartUpgradePlan');
+    expect(channels).toContain('brew:upgradeSmart');
     expect(channels).toContain('brew:checkNow');
     expect(channels).toContain('brew:syncMetadata');
     expect(channels).toContain('settings:get');

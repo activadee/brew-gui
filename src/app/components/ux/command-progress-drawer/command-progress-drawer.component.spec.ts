@@ -42,6 +42,7 @@ describe('CommandProgressDrawerComponent', () => {
         | 'reinstall'
         | 'upgradeOne'
         | 'upgradeAll'
+        | 'upgradeSmart'
         | 'cleanup'
         | 'pin'
         | 'unpin'

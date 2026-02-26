@@ -15,6 +15,8 @@ import {
   checkNowResultSchema,
   cleanupPreviewResultSchema,
   searchCatalogRequestSchema,
+  smartUpgradePlanSchema,
+  smartUpgradeRunRequestSchema,
   syncMetadataResultSchema,
   upgradeOneRequestSchema,
   windowChromeStateSchema,
@@ -227,6 +229,24 @@ export function registerIpcHandlers(options: RegisterIpcOptions): void {
       onFailed: emitJobFailed
     })
   );
+
+  ipcMain.handle(IPC_CHANNELS.GET_SMART_UPGRADE_PLAN, async () => {
+    const blockedPackages = settingsStore.getSettings().smartUpgradeBlockedPackages;
+    return smartUpgradePlanSchema.parse(
+      await homebrew.getSmartUpgradePlan(blockedPackages)
+    );
+  });
+
+  ipcMain.handle(IPC_CHANNELS.UPGRADE_SMART, async (_event, payload) => {
+    const parsed = smartUpgradeRunRequestSchema.parse(payload);
+    const blockedPackages = settingsStore.getSettings().smartUpgradeBlockedPackages;
+
+    return homebrew.upgradeSmart(parsed, blockedPackages, {
+      onProgress: emitJobProgress,
+      onComplete: emitJobComplete,
+      onFailed: emitJobFailed
+    });
+  });
 
   ipcMain.handle(IPC_CHANNELS.CHECK_NOW, async (): Promise<CheckNowResult> => {
     return checkNowResultSchema.parse(await runManualUpdateCheck());

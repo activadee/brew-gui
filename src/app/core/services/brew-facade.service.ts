@@ -22,6 +22,8 @@ import type {
   ServiceRequest,
   SearchCatalogRequest,
   SearchCatalogResponse,
+  SmartUpgradePlan,
+  SmartUpgradeRunRequest,
   SyncMetadataResult,
   TapAddRequest,
   TapRemoveRequest,
@@ -139,6 +141,14 @@ export class BrewFacadeService {
 
   upgradeAll(): Promise<BrewJobCompleteEvent> {
     return this.bridge.api.upgradeAll();
+  }
+
+  getSmartUpgradePlan(): Promise<SmartUpgradePlan> {
+    return this.bridge.api.getSmartUpgradePlan();
+  }
+
+  upgradeSmart(request: SmartUpgradeRunRequest): Promise<BrewJobCompleteEvent> {
+    return this.bridge.api.upgradeSmart(request);
   }
 
   checkNow(): Promise<CheckNowResult> {

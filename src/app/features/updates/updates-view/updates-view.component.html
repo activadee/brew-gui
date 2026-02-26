@@ -22,6 +22,16 @@
           >
             Upgrade all
           </button>
+          <button
+            type="button"
+            z-button
+            zType="outline"
+            zSize="sm"
+            (click)="openSmartUpgrade()"
+            [zDisabled]="updatesStore.updateCount() === 0 || actionBusy()"
+          >
+            Smart upgrade
+          </button>
         </div>
       </header>
 
@@ -61,6 +71,7 @@
               [kind]="item.kind"
               [desc]="versionLabel(item)"
               [pinned]="item.pinned"
+              [smartUpgradeBlocked]="smartUpgradeBlocked(item)"
               [installedVersion]="item.installedVersions.at(0) ?? null"
               [currentVersion]="item.currentVersion"
               [actionLabel]="upgradeActionLabel(item)"
@@ -83,5 +94,16 @@
       [busy]="updatesStore.upgrading()"
       (cancel)="closeDialog()"
       (confirm)="confirmUpgrade()"
+    />
+
+    <app-smart-upgrade-dialog
+      [open]="smartDialogIsOpen()"
+      [plan]="updatesStore.smartPlan()"
+      [selectedRisks]="selectedSmartRisks()"
+      [busy]="updatesStore.smartPlanning() || updatesStore.smartRunning()"
+      [error]="updatesStore.error()"
+      (selectedRisksChange)="onSmartRisksChange($event)"
+      (cancel)="closeSmartUpgradeDialog()"
+      (confirm)="confirmSmartUpgrade()"
     />
   

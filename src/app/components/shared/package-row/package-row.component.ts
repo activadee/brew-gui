@@ -26,6 +26,7 @@ export class PackageRowComponent {
   readonly kind = input<PackageKind>('formula');
   readonly desc = input<string | null>(null);
   readonly pinned = input(false);
+  readonly smartUpgradeBlocked = input(false);
   readonly installedVersion = input<string | null>(null);
   readonly currentVersion = input<string | null>(null);
   readonly tap = input<string | null>(null);

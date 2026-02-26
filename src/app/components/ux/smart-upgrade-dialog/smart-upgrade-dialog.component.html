@@ -1,0 +1,60 @@
+@if (open()) {
+  <div class="fixed inset-0 z-40 bg-black/35 backdrop-blur-sm" (click)="cancel.emit()"></div>
+  <section class="fixed left-1/2 top-1/2 z-50 w-[560px] max-w-[94vw] -translate-x-1/2 -translate-y-1/2">
+    <z-card class="border-border/70 bg-popover/95 shadow-2xl">
+      <div class="space-y-3">
+        <div class="space-y-1">
+          <h3 class="text-base font-semibold">Smart upgrade review</h3>
+          <p class="text-sm text-muted-foreground">
+            Review risk batches and run selected levels. Pinned and user-blocked packages are excluded.
+          </p>
+        </div>
+
+        @if (error()) {
+          <p class="rounded-md border border-destructive/50 bg-destructive/10 p-2 text-sm text-destructive">{{ error() }}</p>
+        }
+
+        @if (plan(); as smartPlan) {
+          <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <z-badge zType="outline" zShape="pill" class="justify-center">eligible {{ smartPlan.totals.eligible }}</z-badge>
+            <z-badge zType="outline" zShape="pill" class="justify-center">pinned {{ smartPlan.totals.excludedPinned }}</z-badge>
+            <z-badge zType="outline" zShape="pill" class="justify-center">blocked {{ smartPlan.totals.excludedBlocked }}</z-badge>
+            <z-badge zType="outline" zShape="pill" class="justify-center">outdated {{ smartPlan.totals.outdated }}</z-badge>
+          </div>
+
+          <div class="space-y-2 rounded-md border border-border/60 bg-muted/20 p-3">
+            <p class="text-sm font-medium">Risk selection</p>
+            @for (risk of riskRows(); track risk.value) {
+              <label class="flex items-center justify-between gap-2 rounded-md border border-border/60 bg-card/70 px-2 py-1.5">
+                <span class="text-sm">{{ risk.label }}</span>
+                <span class="flex items-center gap-2">
+                  <z-badge zType="outline" zShape="pill" class="mono text-[10px]">{{ risk.count }}</z-badge>
+                  <input
+                    type="checkbox"
+                    class="h-4 w-4 rounded border-border"
+                    [checked]="isRiskSelected(risk.value)"
+                    [disabled]="busy() || risk.count === 0"
+                    (change)="onRiskToggle(risk.value, $any($event.target).checked)"
+                  />
+                </span>
+              </label>
+            }
+          </div>
+        } @else {
+          <p class="text-sm text-muted-foreground">Loading smart-upgrade plan…</p>
+        }
+
+        <z-divider zSpacing="sm" />
+
+        <div class="flex justify-end gap-2">
+          <button type="button" z-button zType="outline" zSize="sm" [zDisabled]="busy()" (click)="cancel.emit()">
+            Cancel
+          </button>
+          <button type="button" z-button zSize="sm" [zDisabled]="!canConfirm()" (click)="confirm.emit()">
+            {{ busy() ? 'Running…' : 'Run smart upgrade' }}
+          </button>
+        </div>
+      </div>
+    </z-card>
+  </section>
+}

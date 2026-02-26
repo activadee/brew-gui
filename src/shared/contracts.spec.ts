@@ -14,6 +14,8 @@ import {
   packageDetailsRequestSchema,
   packageDetailsSchema,
   quietHoursTimeSchema,
+  smartUpgradePlanSchema,
+  smartUpgradeRunRequestSchema,
   serviceRequestSchema,
   tapAddRequestSchema,
   tapRemoveRequestSchema,
@@ -77,8 +79,49 @@ describe('window chrome contracts', () => {
 
     expect(parsed.scheduledMetadataSyncEnabled).toBe(true);
     expect(parsed.scheduledCleanupEnabled).toBe(true);
+    expect(parsed.smartUpgradeBlockedPackages).toEqual([]);
     expect(parsed.quietHoursStart).toBe('21:30');
     expect(parsed.quietHoursEnd).toBe('06:15');
+  });
+
+  it('exposes default smart-upgrade blocked package settings', () => {
+    expect(DEFAULT_SETTINGS.smartUpgradeBlockedPackages).toEqual([]);
+  });
+
+  it('parses smart upgrade plan payloads and run requests', () => {
+    const plan = smartUpgradePlanSchema.parse({
+      generatedAt: '2026-02-26T00:00:00.000Z',
+      low: [
+        {
+          id: 'formula:ripgrep',
+          kind: 'formula',
+          name: 'ripgrep',
+          installedVersion: '14.0.0',
+          currentVersion: '14.0.1',
+          risk: 'low',
+          reason: 'Patch version update'
+        }
+      ],
+      medium: [],
+      high: [],
+      excludedPinned: [],
+      excludedBlocked: [],
+      totals: {
+        outdated: 1,
+        eligible: 1,
+        low: 1,
+        medium: 0,
+        high: 0,
+        excludedPinned: 0,
+        excludedBlocked: 0
+      }
+    });
+    const runRequest = smartUpgradeRunRequestSchema.parse({
+      risks: ['low', 'medium']
+    });
+
+    expect(plan.low[0]?.risk).toBe('low');
+    expect(runRequest.risks).toEqual(['low', 'medium']);
   });
 
   it('rejects invalid quiet-hours times', () => {
@@ -367,6 +410,22 @@ describe('window chrome contracts', () => {
     });
 
     expect(cleanup.success).toBe(true);
+  });
+
+  it('accepts smart-upgrade job actions', () => {
+    const smartUpgrade = brewJobProgressEventSchema.safeParse({
+      jobId: 'job-11',
+      action: 'upgradeSmart',
+      command: 'brew smart-upgrade',
+      stage: 'running',
+      stream: 'system',
+      message: 'Running smart upgrade',
+      packageName: null,
+      kind: 'system',
+      timestamp: '2026-02-26T00:00:00.000Z'
+    });
+
+    expect(smartUpgrade.success).toBe(true);
   });
 
   it('accepts doctor job actions', () => {

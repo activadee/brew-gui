@@ -73,4 +73,26 @@ describe('SettingsStore', () => {
     expect(updated.quietHoursEnd).toBe('06:30');
     expect(updated.checkIntervalMinutes).toBe(DEFAULT_SETTINGS.checkIntervalMinutes);
   });
+
+  it('persists smart-upgrade blocked package preferences', () => {
+    const store = new SettingsStore();
+
+    const updated = store.updateSettings({
+      smartUpgradeBlockedPackages: [
+        {
+          kind: 'formula',
+          name: 'openssl@3'
+        },
+        {
+          kind: 'cask',
+          name: 'firefox'
+        }
+      ]
+    });
+
+    expect(updated.smartUpgradeBlockedPackages).toEqual([
+      { kind: 'formula', name: 'openssl@3' },
+      { kind: 'cask', name: 'firefox' }
+    ]);
+  });
 });

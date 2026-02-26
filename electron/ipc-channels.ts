@@ -24,6 +24,8 @@ export const IPC_CHANNELS = {
   DOCTOR_RUN: 'brew:doctorRun',
   UPGRADE_ONE: 'brew:upgradeOne',
   UPGRADE_ALL: 'brew:upgradeAll',
+  GET_SMART_UPGRADE_PLAN: 'brew:getSmartUpgradePlan',
+  UPGRADE_SMART: 'brew:upgradeSmart',
   CHECK_NOW: 'brew:checkNow',
   SYNC_METADATA: 'brew:syncMetadata',
   GET_SETTINGS: 'settings:get',

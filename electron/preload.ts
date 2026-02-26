@@ -26,6 +26,8 @@ import {
   outdatedPackageSchema,
   searchCatalogRequestSchema,
   searchCatalogResponseSchema,
+  smartUpgradePlanSchema,
+  smartUpgradeRunRequestSchema,
   syncMetadataResultSchema,
   updatesChangedEventSchema,
   upgradeOneRequestSchema,
@@ -171,6 +173,17 @@ const api: BrewGuiBridge = {
 
   async upgradeAll() {
     const payload = await ipcRenderer.invoke(IPC_CHANNELS.UPGRADE_ALL);
+    return brewJobCompleteEventSchema.parse(payload);
+  },
+
+  async getSmartUpgradePlan() {
+    const payload = await ipcRenderer.invoke(IPC_CHANNELS.GET_SMART_UPGRADE_PLAN);
+    return smartUpgradePlanSchema.parse(payload);
+  },
+
+  async upgradeSmart(request) {
+    const parsedRequest = smartUpgradeRunRequestSchema.parse(request);
+    const payload = await ipcRenderer.invoke(IPC_CHANNELS.UPGRADE_SMART, parsedRequest);
     return brewJobCompleteEventSchema.parse(payload);
   },
 

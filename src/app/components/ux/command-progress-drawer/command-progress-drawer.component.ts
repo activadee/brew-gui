@@ -39,6 +39,7 @@ export class CommandProgressDrawerComponent {
     { value: 'reinstall', label: 'Reinstall' },
     { value: 'upgradeOne', label: 'Upgrade one' },
     { value: 'upgradeAll', label: 'Upgrade all' },
+    { value: 'upgradeSmart', label: 'Smart upgrade' },
     { value: 'cleanup', label: 'Cleanup' },
     { value: 'doctor', label: 'Doctor' },
     { value: 'pin', label: 'Pin' },
@@ -82,6 +83,8 @@ export class CommandProgressDrawerComponent {
         return 'Upgrade package';
       case 'upgradeAll':
         return 'Upgrade all';
+      case 'upgradeSmart':
+        return 'Smart upgrade';
       case 'cleanup':
         return 'Cleanup';
       case 'doctor':

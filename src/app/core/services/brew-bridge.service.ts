@@ -24,6 +24,8 @@ import {
   type ServiceRequest,
   type SearchCatalogRequest,
   type SearchCatalogResponse,
+  type SmartUpgradePlan,
+  type SmartUpgradeRunRequest,
   type TapAddRequest,
   type TapRemoveRequest,
   type UnpinOneRequest,
@@ -252,6 +254,33 @@ const createFallbackBridge = (): BrewGuiBridge => ({
     return createFallbackJobCompleteEvent({
       action: 'upgradeAll',
       command: 'brew upgrade --formula && brew upgrade --cask',
+      kind: 'system',
+      packageName: null
+    });
+  },
+  async getSmartUpgradePlan(): Promise<SmartUpgradePlan> {
+    return {
+      generatedAt: new Date().toISOString(),
+      low: [],
+      medium: [],
+      high: [],
+      excludedPinned: [],
+      excludedBlocked: [],
+      totals: {
+        outdated: 0,
+        eligible: 0,
+        low: 0,
+        medium: 0,
+        high: 0,
+        excludedPinned: 0,
+        excludedBlocked: 0
+      }
+    };
+  },
+  async upgradeSmart(request: SmartUpgradeRunRequest): Promise<BrewJobCompleteEvent> {
+    return createFallbackJobCompleteEvent({
+      action: 'upgradeSmart',
+      command: `brew smart-upgrade --risks ${request.risks.join(',')}`,
       kind: 'system',
       packageName: null
     });

@@ -1240,6 +1240,177 @@ describe('HomebrewService.upgradeAll', () => {
   });
 });
 
+describe('HomebrewService.getSmartUpgradePlan', () => {
+  it('builds smart-upgrade batches with pinned and blocked exclusions', async () => {
+    const service = new HomebrewService() as any;
+    service.getOutdated = vi.fn(async () => [
+      {
+        id: 'formula:ripgrep',
+        kind: 'formula',
+        name: 'ripgrep',
+        installedVersions: ['14.0.0'],
+        currentVersion: '14.0.1',
+        pinned: false
+      },
+      {
+        id: 'formula:openssl@3',
+        kind: 'formula',
+        name: 'openssl@3',
+        installedVersions: ['3.1.0'],
+        currentVersion: '3.2.0',
+        pinned: true
+      },
+      {
+        id: 'cask:firefox',
+        kind: 'cask',
+        name: 'firefox',
+        installedVersions: ['120.0.0'],
+        currentVersion: '121.0.0',
+        pinned: false
+      }
+    ]);
+
+    const plan = await service.getSmartUpgradePlan([
+      {
+        kind: 'formula',
+        name: 'ripgrep'
+      }
+    ]);
+
+    expect(plan.totals.outdated).toBe(3);
+    expect(plan.totals.excludedPinned).toBe(1);
+    expect(plan.totals.excludedBlocked).toBe(1);
+    expect(plan.excludedPinned.map((item: { name: string }) => item.name)).toEqual(['openssl@3']);
+    expect(plan.excludedBlocked.map((item: { name: string }) => item.name)).toEqual(['ripgrep']);
+    expect(plan.high.map((item: { name: string }) => item.name)).toEqual(['firefox']);
+  });
+});
+
+describe('HomebrewService.upgradeSmart', () => {
+  it('runs only selected risk batches in low->medium->high order', async () => {
+    const service = new HomebrewService() as any;
+    service.getOutdated = vi.fn(async () => [
+      {
+        id: 'formula:bat',
+        kind: 'formula',
+        name: 'bat',
+        installedVersions: ['0.24.0'],
+        currentVersion: '0.24.1',
+        pinned: false
+      },
+      {
+        id: 'formula:fd',
+        kind: 'formula',
+        name: 'fd',
+        installedVersions: ['9.0.0'],
+        currentVersion: '9.1.0',
+        pinned: false
+      },
+      {
+        id: 'cask:firefox',
+        kind: 'cask',
+        name: 'firefox',
+        installedVersions: ['120.0.0'],
+        currentVersion: '121.0.0',
+        pinned: false
+      }
+    ]);
+    const runText = vi.fn(async () => ({
+      stdout: 'ok',
+      stderr: '',
+      exitCode: 0
+    }));
+    const enqueue = vi.fn(async (task: (signal: AbortSignal) => Promise<unknown>) =>
+      task(new AbortController().signal)
+    );
+    const onProgress = vi.fn();
+
+    service.runner = { runText };
+    service.mutationQueue = { enqueue };
+
+    const result = await service.upgradeSmart(
+      { risks: ['low', 'high'] },
+      [],
+      {
+        onProgress,
+        onComplete: () => undefined,
+        onFailed: () => undefined
+      }
+    );
+
+    expect(runText.mock.calls.map((call: [string[]]) => call[0])).toEqual([
+      ['upgrade', '--formula', 'bat'],
+      ['upgrade', '--cask', 'firefox']
+    ]);
+    expect(onProgress.mock.calls[0]?.[0].action).toBe('upgradeSmart');
+    expect(result.action).toBe('upgradeSmart');
+    expect(result.command).toContain('smart-upgrade');
+  });
+
+  it('continues after package failures and emits a final failed event summary', async () => {
+    const service = new HomebrewService() as any;
+    service.getOutdated = vi.fn(async () => [
+      {
+        id: 'formula:bat',
+        kind: 'formula',
+        name: 'bat',
+        installedVersions: ['0.24.0'],
+        currentVersion: '0.24.1',
+        pinned: false
+      },
+      {
+        id: 'formula:ripgrep',
+        kind: 'formula',
+        name: 'ripgrep',
+        installedVersions: ['14.0.0'],
+        currentVersion: '14.0.1',
+        pinned: false
+      }
+    ]);
+    const runText = vi
+      .fn()
+      .mockImplementationOnce(async () => {
+        throw new BrewCommandError('upgrade failed', {
+          command: ['upgrade', '--formula', 'bat'],
+          exitCode: 1,
+          stdout: '',
+          stderr: 'Error: bat failed'
+        });
+      })
+      .mockResolvedValueOnce({
+        stdout: 'ripgrep upgraded',
+        stderr: '',
+        exitCode: 0
+      });
+    const enqueue = vi.fn(async (task: (signal: AbortSignal) => Promise<unknown>) =>
+      task(new AbortController().signal)
+    );
+    const onFailed = vi.fn();
+
+    service.runner = { runText };
+    service.mutationQueue = { enqueue };
+
+    await expect(
+      service.upgradeSmart(
+        { risks: ['low'] },
+        [],
+        {
+          onProgress: () => undefined,
+          onComplete: () => undefined,
+          onFailed
+        }
+      )
+    ).rejects.toThrow('Smart upgrade completed with failures');
+
+    expect(runText).toHaveBeenCalledTimes(2);
+    expect(onFailed).toHaveBeenCalledTimes(1);
+    expect(onFailed.mock.calls[0]?.[0]).toMatchObject({
+      action: 'upgradeSmart',
+      kind: 'system'
+    });
+  });
+});
+
 describe('HomebrewService.runDoctor', () => {
   it('parses warning diagnostics from exit-code 1 output and emits completion metadata', async () => {
     const service = new HomebrewService() as any;
