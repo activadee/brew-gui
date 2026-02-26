@@ -1,7 +1,12 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 
 import { ZardButtonComponent } from '@/shared/components/button';
-import type { OutdatedPackage, SmartUpgradePlan, SmartUpgradeRiskLevel } from '../../../../shared/contracts';
+import type {
+  InstalledPackage,
+  OutdatedPackage,
+  SmartUpgradePlan,
+  SmartUpgradeRiskLevel
+} from '../../../../shared/contracts';
 import { EmptyStateComponent } from '../../../components/foundation/empty-state/empty-state.component';
 import { LoadingStateComponent } from '../../../components/foundation/loading-state/loading-state.component';
 import { PackageFilterChipsComponent } from '../../../components/shared/package-filter-chips/package-filter-chips.component';
@@ -15,6 +20,12 @@ import { ToastService } from '../../../core/services/toast.service';
 import { InstalledStore } from '../../../core/stores/installed.store';
 import { PackageDetailsStore } from '../../../core/stores/package-details.store';
 import { UpdatesStore } from '../../../core/stores/updates.store';
+import {
+  buildUpdateChannelCounts,
+  buildUpdateChannelMap,
+  type UpdateChannel,
+  type UpdateChannelFilter
+} from '../update-channel-classifier';
 
 @Component({
   selector: 'app-updates-view',
@@ -49,6 +60,61 @@ export class UpdatesViewComponent {
     { value: 'pinned', label: 'Pinned', count: this.updatesStore.pinnedCount() },
     { value: 'unpinned', label: 'Unpinned', count: this.updatesStore.unpinnedCount() }
   ]);
+
+  protected readonly channelFilter = signal<UpdateChannelFilter>('all');
+  protected readonly installedById = computed(() => {
+    const byId = new Map<string, InstalledPackage>();
+
+    for (const item of this.installedStore.items()) {
+      byId.set(item.id, item);
+    }
+
+    return byId;
+  });
+  protected readonly updateChannelMap = computed(() =>
+    buildUpdateChannelMap(this.updatesStore.items(), this.installedById())
+  );
+  protected readonly channelCounts = computed(() =>
+    buildUpdateChannelCounts(this.updatesStore.items(), this.updateChannelMap())
+  );
+  protected readonly channelFilterOptions = computed(() => {
+    const counts = this.channelCounts();
+
+    return [
+      { value: 'all', label: 'All', count: this.updatesStore.updateCount() },
+      { value: 'critical', label: 'Critical', count: counts.critical },
+      { value: 'security', label: 'Security', count: counts.security },
+      { value: 'normal', label: 'Normal', count: counts.normal }
+    ];
+  });
+  protected readonly channelFilteredItems = computed(() => {
+    const selected = this.channelFilter();
+    const filtered = this.updatesStore.filteredItems();
+
+    if (selected === 'all') {
+      return filtered;
+    }
+
+    const channels = this.updateChannelMap();
+    return filtered.filter((item) => (channels.get(item.id) ?? 'normal') === selected);
+  });
+  protected readonly emptyStateLabel = computed(() => {
+    const channel = this.channelFilter();
+    if (channel === 'all') {
+      return 'No updates';
+    }
+
+    return `No ${channel} updates`;
+  });
+  protected readonly emptyStateDescription = computed(() => {
+    const channel = this.channelFilter();
+    if (channel === 'all') {
+      return 'Everything looks up to date for the selected package type.';
+    }
+
+    return `No ${channel} channel updates match the current filters.`;
+  });
+
   protected readonly actionBusy = computed(
     () =>
       this.updatesStore.upgrading()
@@ -64,6 +130,10 @@ export class UpdatesViewComponent {
 
   protected onPinFilterChange(value: string): void {
     this.updatesStore.setPinFilter(value as 'all' | 'pinned' | 'unpinned');
+  }
+
+  protected onChannelFilterChange(value: string): void {
+    this.channelFilter.set(value as UpdateChannelFilter);
   }
 
   private readonly selectedPackage = signal<OutdatedPackage | null>(null);
@@ -104,6 +174,10 @@ export class UpdatesViewComponent {
 
   protected upgradeActionDisabled(item: OutdatedPackage): boolean {
     return this.actionBusy() || !this.canUpgrade(item);
+  }
+
+  protected updateChannelFor(item: OutdatedPackage): UpdateChannel {
+    return this.updateChannelMap().get(item.id) ?? 'normal';
   }
 
   protected overflowActionsFor(item: OutdatedPackage): PackageRowOverflowAction[] {

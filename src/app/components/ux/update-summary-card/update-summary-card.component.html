@@ -5,7 +5,12 @@
           <p class="mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Update Summary</p>
           <p class="mt-1 text-sm">{{ summaryLine() }}</p>
         </div>
-        <z-badge zType="outline" zShape="pill" class="mono">{{ count() }}</z-badge>
+        <div class="flex flex-wrap items-center justify-end gap-1">
+          <z-badge zType="outline" zShape="pill" class="mono">total {{ count() }}</z-badge>
+          <z-badge zType="destructive" zShape="pill" class="mono">critical {{ criticalCount() }}</z-badge>
+          <z-badge zType="secondary" zShape="pill" class="mono">security {{ securityCount() }}</z-badge>
+          <z-badge zType="outline" zShape="pill" class="mono">normal {{ normalCount() }}</z-badge>
+        </div>
       </div>
     </z-card>
   

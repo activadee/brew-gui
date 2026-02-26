@@ -37,6 +37,9 @@
 
       <app-update-summary-card
         [count]="updatesStore.updateCount()"
+        [criticalCount]="channelCounts().critical"
+        [securityCount]="channelCounts().security"
+        [normalCount]="channelCounts().normal"
         [lastCheckedAt]="updatesStore.lastCheckedAt()"
       />
 
@@ -54,24 +57,31 @@
         (selectedChange)="onPinFilterChange($event)"
       />
 
+      <app-package-filter-chips
+        [selected]="channelFilter()"
+        [options]="channelFilterOptions()"
+        (selectedChange)="onChannelFilterChange($event)"
+      />
+
       @if (updatesStore.loading()) {
         <app-loading-state label="Checking outdated packages…" />
       } @else if (updatesStore.error()) {
         <app-empty-state label="Update check failed" [description]="updatesStore.error() ?? ''" />
-      } @else if (updatesStore.filteredItems().length === 0) {
+      } @else if (channelFilteredItems().length === 0) {
         <app-empty-state
-          label="No updates"
-          description="Everything looks up to date for the selected package type."
+          [label]="emptyStateLabel()"
+          [description]="emptyStateDescription()"
         />
       } @else {
         <div class="stagger-list space-y-1.5">
-          @for (item of updatesStore.filteredItems(); track item.id) {
+          @for (item of channelFilteredItems(); track item.id) {
             <app-package-row
               [name]="item.name"
               [kind]="item.kind"
               [desc]="versionLabel(item)"
               [pinned]="item.pinned"
               [smartUpgradeBlocked]="smartUpgradeBlocked(item)"
+              [updateChannel]="updateChannelFor(item)"
               [installedVersion]="item.installedVersions.at(0) ?? null"
               [currentVersion]="item.currentVersion"
               [actionLabel]="upgradeActionLabel(item)"

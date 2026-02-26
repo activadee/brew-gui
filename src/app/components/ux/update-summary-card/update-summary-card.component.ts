@@ -12,6 +12,9 @@ import { ZardCardComponent } from '@/shared/components/card';
 })
 export class UpdateSummaryCardComponent {
   readonly count = input(0);
+  readonly criticalCount = input(0);
+  readonly securityCount = input(0);
+  readonly normalCount = input(0);
   readonly lastCheckedAt = input<string | null>(null);
 
   readonly summaryLine = computed(() => {

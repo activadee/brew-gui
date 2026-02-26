@@ -2,7 +2,7 @@ import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { describe, expect, it, vi } from 'vitest';
 
-import type { OutdatedPackage, SmartUpgradePlan } from '../../../../shared/contracts';
+import type { InstalledPackage, OutdatedPackage, SmartUpgradePlan } from '../../../../shared/contracts';
 import { ToastService } from '../../../core/services/toast.service';
 import { InstalledStore } from '../../../core/stores/installed.store';
 import { PackageDetailsStore } from '../../../core/stores/package-details.store';
@@ -31,6 +31,33 @@ const caskItem: OutdatedPackage = {
   name: 'visual-studio-code',
   installedVersions: ['1.96.0'],
   currentVersion: '1.97.0',
+  pinned: false
+};
+
+const criticalItem: OutdatedPackage = {
+  id: 'formula:node',
+  kind: 'formula',
+  name: 'node',
+  installedVersions: ['20.9.0'],
+  currentVersion: '21.0.0',
+  pinned: false
+};
+
+const securityItem: OutdatedPackage = {
+  id: 'formula:openssl@3',
+  kind: 'formula',
+  name: 'openssl@3',
+  installedVersions: ['3.0.0'],
+  currentVersion: '3.0.1',
+  pinned: false
+};
+
+const normalItem: OutdatedPackage = {
+  id: 'formula:bat',
+  kind: 'formula',
+  name: 'bat',
+  installedVersions: ['0.24.0'],
+  currentVersion: '0.24.1',
   pinned: false
 };
 
@@ -72,10 +99,31 @@ const smartPlan: SmartUpgradePlan = {
   }
 };
 
-function createUpdatesStore(items: OutdatedPackage[]) {
+function toInstalled(item: OutdatedPackage, overrides: Partial<InstalledPackage> = {}): InstalledPackage {
+  return {
+    id: item.id,
+    kind: item.kind,
+    name: item.name,
+    desc: null,
+    installedVersion: item.installedVersions[0] ?? 'unknown',
+    currentVersion: item.currentVersion,
+    pinned: item.pinned,
+    tap: item.kind === 'formula' ? 'homebrew/core' : 'homebrew/cask',
+    homepage: null,
+    deprecated: false,
+    disabled: false,
+    deprecationReason: null,
+    disableReason: null,
+    replacement: null,
+    ...overrides
+  };
+}
+
+function createUpdatesStore(items: OutdatedPackage[], filtered: OutdatedPackage[]) {
   const blocked = new Set<string>();
 
   return {
+    items: signal(items),
     updateCount: signal(items.length),
     pinnedCount: signal(items.filter((item) => item.pinned).length),
     unpinnedCount: signal(items.filter((item) => !item.pinned).length),
@@ -85,7 +133,7 @@ function createUpdatesStore(items: OutdatedPackage[]) {
     pinFilter: signal<'all' | 'pinned' | 'unpinned'>('all'),
     loading: signal(false),
     error: signal<string | null>(null),
-    filteredItems: signal(items),
+    filteredItems: signal(filtered),
     upgrading: signal(false),
     pinning: signal(false),
     smartPlan: signal<SmartUpgradePlan | null>(smartPlan),
@@ -116,9 +164,18 @@ function createUpdatesStore(items: OutdatedPackage[]) {
 }
 
 describe('UpdatesViewComponent', () => {
-  async function render(items: OutdatedPackage[]) {
-    const updatesStore = createUpdatesStore(items);
-    const installedStore = { refresh: vi.fn(async () => undefined) };
+  async function render(
+    items: OutdatedPackage[],
+    options?: { filteredItems?: OutdatedPackage[]; installedItems?: InstalledPackage[] }
+  ) {
+    const filteredItems = options?.filteredItems ?? items;
+    const installedItems = options?.installedItems ?? items.map((item) => toInstalled(item));
+
+    const updatesStore = createUpdatesStore(items, filteredItems);
+    const installedStore = {
+      refresh: vi.fn(async () => undefined),
+      items: signal(installedItems)
+    };
     const packageDetailsStore = { openFor: vi.fn(async () => undefined) };
     const toast = { push: vi.fn() };
 
@@ -139,6 +196,50 @@ describe('UpdatesViewComponent', () => {
 
     return { fixture, updatesStore, installedStore, packageDetailsStore, toast };
   }
+
+  it('defaults to all channel filter and computes channel counts', async () => {
+    const { fixture } = await render([criticalItem, securityItem, normalItem]);
+    const component = fixture.componentInstance as any;
+
+    expect(component.channelFilter()).toBe('all');
+    expect(component.channelFilterOptions()).toEqual([
+      { value: 'all', label: 'All', count: 3 },
+      { value: 'critical', label: 'Critical', count: 1 },
+      { value: 'security', label: 'Security', count: 1 },
+      { value: 'normal', label: 'Normal', count: 1 }
+    ]);
+  });
+
+  it('filters rendered updates by selected update channel', async () => {
+    const { fixture } = await render([criticalItem, securityItem, normalItem]);
+    const component = fixture.componentInstance as any;
+
+    component.onChannelFilterChange('critical');
+    expect(component.channelFilteredItems().map((item: OutdatedPackage) => item.name)).toEqual(['node']);
+
+    component.onChannelFilterChange('security');
+    expect(component.channelFilteredItems().map((item: OutdatedPackage) => item.name)).toEqual(['openssl@3']);
+
+    component.onChannelFilterChange('normal');
+    expect(component.channelFilteredItems().map((item: OutdatedPackage) => item.name)).toEqual(['bat']);
+  });
+
+  it('computes channel counts from full update set even when filtered list is narrowed', async () => {
+    const { fixture } = await render([criticalItem, securityItem, normalItem], {
+      filteredItems: [normalItem]
+    });
+    const component = fixture.componentInstance as any;
+
+    expect(component.channelFilteredItems().map((item: OutdatedPackage) => item.name)).toEqual(['bat']);
+    expect(component.channelCounts()).toEqual({
+      critical: 1,
+      security: 1,
+      normal: 1
+    });
+
+    component.onChannelFilterChange('critical');
+    expect(component.channelFilteredItems()).toEqual([]);
+  });
 
   it('shows success toast and closes dialog when upgrade-all starts', async () => {
     const { fixture, toast } = await render([baseItem]);

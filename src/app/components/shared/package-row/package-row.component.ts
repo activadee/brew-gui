@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, input, output } from '@angular/core
 
 import { ZardCardComponent } from '@/shared/components/card';
 import type { PackageKind, PackageReplacement } from '../../../../shared/contracts';
+import type { UpdateChannel } from '../../../features/updates/update-channel-classifier';
 import { PackageActionButtonComponent } from '../package-action-button/package-action-button.component';
 import { PackageMetaComponent } from '../package-meta/package-meta.component';
 import {
@@ -27,6 +28,7 @@ export class PackageRowComponent {
   readonly desc = input<string | null>(null);
   readonly pinned = input(false);
   readonly smartUpgradeBlocked = input(false);
+  readonly updateChannel = input<UpdateChannel | null>(null);
   readonly installedVersion = input<string | null>(null);
   readonly currentVersion = input<string | null>(null);
   readonly tap = input<string | null>(null);
