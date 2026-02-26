@@ -91,7 +91,6 @@ export class ZardButtonGroupDividerComponent {
     '[class]': 'classes()',
   },
   exportAs: 'zButtonGroupText',
-  styleUrl: './button-group.component.css',
 })
 export class ZardButtonGroupTextDirective {
   readonly class = input<ClassValue>('');

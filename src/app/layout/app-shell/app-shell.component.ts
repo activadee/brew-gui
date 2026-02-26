@@ -41,7 +41,6 @@ const ROUTE_LABELS: Record<string, string> = {
   '/browse': 'Browse',
   '/cleanup': 'Cleanup',
   '/taps': 'Taps',
-  '/cleanup': 'Cleanup',
   '/settings': 'Settings',
   '/tray': 'Tray'
 };
