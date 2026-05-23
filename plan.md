@@ -1,4 +1,4 @@
-# Brew Sidebar — Comprehensive Implementation Plan
+# Brewdeck — Comprehensive Implementation Plan
 
 ## Current baseline
 

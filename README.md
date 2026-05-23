@@ -1,6 +1,8 @@
-# Brew Sidebar
+# Brewdeck
 
 Minimalistic macOS Electron wrapper around Homebrew with Angular 21, Tailwind CSS 4, and Signal Stores.
+
+> **Upgrading from Brew Sidebar:** The macOS bundle ID changed from `com.brewsidebar.app` to `com.brewdeck.app`. Remove the old **Brew Sidebar** app from Applications before installing Brewdeck to avoid duplicate menu bar entries and conflicting auto-update state.
 
 ## Features
 

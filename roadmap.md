@@ -1,7 +1,7 @@
-# Brew Sidebar Roadmap
+# Brewdeck Roadmap
 
 ## Vision
-Brew Sidebar becomes the safest and fastest desktop control plane for Homebrew: inspect, upgrade, install, remove, and automate package hygiene without dropping to terminal.
+Brewdeck becomes the safest and fastest desktop control plane for Homebrew: inspect, upgrade, install, remove, and automate package hygiene without dropping to terminal.
 
 ## Guiding Principles
 - Keep destructive actions explicit and reversible where possible.
