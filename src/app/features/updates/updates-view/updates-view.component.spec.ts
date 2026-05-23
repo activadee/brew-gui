@@ -3,7 +3,11 @@ import { TestBed } from '@angular/core/testing';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { InstalledPackage, OutdatedPackage, SmartUpgradePlan } from '../../../../shared/contracts';
+import { BrewFacadeService } from '../../../core/services/brew-facade.service';
+import { PackageActionsService } from '../../../core/services/package-actions.service';
 import { ToastService } from '../../../core/services/toast.service';
+import { PackageSelectionStore } from '../../../core/stores/package-selection.store';
+import { TemplatesStore } from '../../../core/stores/templates.store';
 import { InstalledStore } from '../../../core/stores/installed.store';
 import { PackageDetailsStore } from '../../../core/stores/package-details.store';
 import { UpdatesStore } from '../../../core/stores/updates.store';
@@ -177,7 +181,19 @@ describe('UpdatesViewComponent', () => {
       items: signal(installedItems)
     };
     const packageDetailsStore = { openFor: vi.fn(async () => undefined) };
-    const toast = { push: vi.fn() };
+    const toast = { push: vi.fn(), pushWithAction: vi.fn() };
+    const facade = { getPackageDetails: vi.fn(async () => ({ homepage: null })) };
+    const packageActions = {
+      upgradeMany: vi.fn(async () => ({ succeeded: 1, failed: 0, results: [] })),
+      uninstallMany: vi.fn(async () => ({ succeeded: 1, failed: 0, results: [] })),
+      pinMany: vi.fn(async () => ({ succeeded: 1, failed: 0, results: [] })),
+      notifyPinSuccess: vi.fn(),
+      notifyUnpinSuccess: vi.fn(),
+      toggleSmartUpgradeBlocked: vi.fn(async (_target, _blocked, toggle) => toggle()),
+      buildBatchCommandPreview: vi.fn(() => 'brew upgrade'),
+      runTemplate: vi.fn(async () => true)
+    };
+    const templatesStore = { templates: signal([]), load: vi.fn(async () => undefined) };
 
     await TestBed.configureTestingModule({
       imports: [UpdatesViewComponent],
@@ -185,7 +201,11 @@ describe('UpdatesViewComponent', () => {
         { provide: UpdatesStore, useValue: updatesStore },
         { provide: InstalledStore, useValue: installedStore },
         { provide: PackageDetailsStore, useValue: packageDetailsStore },
-        { provide: ToastService, useValue: toast }
+        { provide: BrewFacadeService, useValue: facade },
+        { provide: PackageActionsService, useValue: packageActions },
+        { provide: TemplatesStore, useValue: templatesStore },
+        { provide: ToastService, useValue: toast },
+        PackageSelectionStore
       ]
     }).compileComponents();
 
@@ -194,7 +214,7 @@ describe('UpdatesViewComponent', () => {
     await fixture.whenStable();
     fixture.detectChanges();
 
-    return { fixture, updatesStore, installedStore, packageDetailsStore, toast };
+    return { fixture, updatesStore, installedStore, packageDetailsStore, packageActions, toast };
   }
 
   it('defaults to all channel filter and computes channel counts', async () => {
@@ -291,6 +311,7 @@ describe('UpdatesViewComponent', () => {
 
     expect(component.overflowActionsFor(pinnedItem)).toEqual([
       { id: 'view-details', label: 'View details' },
+      { id: 'run-template', label: 'Run template…', disabled: true },
       { id: 'toggle-smart-upgrade', label: 'Exclude from smart upgrade', disabled: false },
       { id: 'unpin', label: 'Unpin formula', disabled: false }
     ]);
@@ -302,6 +323,7 @@ describe('UpdatesViewComponent', () => {
 
     expect(component.overflowActionsFor(caskItem)).toEqual([
       { id: 'view-details', label: 'View details' },
+      { id: 'run-template', label: 'Run template…', disabled: true },
       { id: 'toggle-smart-upgrade', label: 'Exclude from smart upgrade', disabled: false },
       { id: 'pin-not-supported', label: 'Pin not supported for casks', disabled: true }
     ]);
@@ -320,14 +342,14 @@ describe('UpdatesViewComponent', () => {
   });
 
   it('unpins formula and refreshes installed state from overflow action', async () => {
-    const { fixture, updatesStore, installedStore, toast } = await render([pinnedItem]);
+    const { fixture, updatesStore, installedStore, packageActions } = await render([pinnedItem]);
     const component = fixture.componentInstance as any;
 
     await component.onOverflowAction(pinnedItem, 'unpin');
 
     expect(updatesStore.unpinOne).toHaveBeenCalledWith({ kind: 'formula', name: 'openssl@3' });
     expect(installedStore.refresh).toHaveBeenCalled();
-    expect(toast.push).toHaveBeenCalledWith('Unpinned openssl@3.', 'success');
+    expect(packageActions.notifyUnpinSuccess).toHaveBeenCalledWith('openssl@3');
   });
 
   it('opens smart-upgrade dialog and preselects non-empty risk levels', async () => {
@@ -355,7 +377,7 @@ describe('UpdatesViewComponent', () => {
   });
 
   it('toggles smart-upgrade exclusion from overflow action', async () => {
-    const { fixture, updatesStore, toast } = await render([baseItem]);
+    const { fixture, updatesStore, packageActions } = await render([baseItem]);
     const component = fixture.componentInstance as any;
 
     await component.onOverflowAction(baseItem, 'toggle-smart-upgrade');
@@ -364,6 +386,6 @@ describe('UpdatesViewComponent', () => {
       kind: 'formula',
       name: 'ripgrep'
     });
-    expect(toast.push).toHaveBeenCalledWith('Excluded ripgrep from smart upgrades.', 'success');
+    expect(packageActions.toggleSmartUpgradeBlocked).toHaveBeenCalled();
   });
 });

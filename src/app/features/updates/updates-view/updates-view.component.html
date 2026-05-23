@@ -66,7 +66,11 @@
       @if (updatesStore.loading()) {
         <app-loading-state label="Checking outdated packages…" />
       } @else if (updatesStore.error()) {
-        <app-empty-state label="Update check failed" [description]="updatesStore.error() ?? ''" />
+        <app-diagnostic-panel
+          title="Update check failed"
+          [message]="updatesStore.error() ?? ''"
+          [copyText]="updatesStore.error()"
+        />
       } @else if (channelFilteredItems().length === 0) {
         <app-empty-state
           [label]="emptyStateLabel()"
@@ -76,7 +80,22 @@
         @if (selectionStore.count() > 0) {
           <div class="flex flex-wrap items-center gap-2 rounded-lg border border-border/60 bg-muted/20 p-2">
             <span class="text-sm">{{ selectionStore.count() }} selected</span>
-            <button type="button" z-button zSize="sm" (click)="batchUpgradeSelected()">Upgrade selected</button>
+            <button type="button" z-button zSize="sm" [zDisabled]="actionBusy()" (click)="batchUpgradeSelected()">
+              Upgrade selected
+            </button>
+            <button type="button" z-button zType="outline" zSize="sm" [zDisabled]="actionBusy()" (click)="openBatchUninstall()">
+              Uninstall selected
+            </button>
+            <button
+              type="button"
+              z-button
+              zType="outline"
+              zSize="sm"
+              [zDisabled]="actionBusy() || batchPinDisabled()"
+              (click)="openBatchPin()"
+            >
+              Pin selected
+            </button>
             <button type="button" z-button zType="outline" zSize="sm" (click)="selectionStore.clear()">Clear</button>
           </div>
         }
@@ -111,10 +130,25 @@
       [open]="confirmOpen()"
       [title]="dialogTitle()"
       [message]="dialogMessage()"
+      [installedVersion]="dialogInstalledVersion()"
+      [currentVersion]="dialogCurrentVersion()"
+      [changelogSnippet]="changelogSnippet()"
       [confirmLabel]="dialogConfirmLabel()"
       [busy]="updatesStore.upgrading()"
       (cancel)="closeDialog()"
       (confirm)="confirmUpgrade()"
+    />
+
+    <app-batch-confirm-dialog
+      [open]="batchConfirmOpen()"
+      [title]="batchDialogTitle()"
+      [message]="batchDialogMessage()"
+      [packageNames]="batchPackageNames()"
+      [commandPreview]="batchCommandPreview()"
+      [confirmLabel]="batchConfirmLabel()"
+      [busy]="batchBusy()"
+      (cancel)="closeBatchDialog()"
+      (confirm)="confirmBatch()"
     />
 
     <app-smart-upgrade-dialog
