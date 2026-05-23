@@ -516,6 +516,7 @@ export class AppShellComponent {
       await this.appStatusStore.initialize();
       void this.templatesStore.load();
 
+      // Informational only: recovery does not re-run brew commands.
       const recovered = await this.facade.recoverJobs();
       this.recoveredJobs.set(recovered);
 
