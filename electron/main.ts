@@ -124,7 +124,7 @@ function createMainWindow(): BrowserWindow {
     height: 760,
     minWidth: 880,
     minHeight: 620,
-    title: 'Brew Sidebar',
+    title: 'Brewdeck',
     backgroundColor: '#ececef',
     autoHideMenuBar: true,
     skipTaskbar: false,
@@ -227,14 +227,14 @@ function createTrayWindow(): BrowserWindow {
 function createTray(): Tray {
   const trayInstance = new Tray(loadTrayIcon());
 
-  trayInstance.setToolTip('Brew Sidebar');
+  trayInstance.setToolTip('Brewdeck');
   trayInstance.on('click', () => {
     toggleTrayWindow();
   });
 
   const contextMenu = Menu.buildFromTemplate([
     {
-      label: 'Open Brew Sidebar',
+      label: 'Open Brewdeck',
       click: () => {
         showMainWindow();
       }
@@ -500,7 +500,7 @@ function applyTrayUpdateSignal(count: number): void {
   }
 
   const notify = settingsStore.getSettings().trayNotifyOnUpdates;
-  tray.setToolTip(count > 0 ? `Brew Sidebar • ${count} updates available` : 'Brew Sidebar • Up to date');
+  tray.setToolTip(count > 0 ? `Brewdeck • ${count} updates available` : 'Brewdeck • Up to date');
   tray.setTitle(notify && count > 0 ? `${count}` : '');
 }
 
