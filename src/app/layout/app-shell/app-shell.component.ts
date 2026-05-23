@@ -42,6 +42,7 @@ const ROUTE_LABELS: Record<string, string> = {
   '/cleanup': 'Cleanup',
   '/services': 'Services',
   '/doctor': 'Doctor',
+  '/history': 'History',
   '/taps': 'Taps',
   '/settings': 'Settings',
   '/tray': 'Tray'
@@ -91,9 +92,11 @@ export class AppShellComponent {
     () => ROUTE_LABELS[this.routePath()] ?? 'Brew Sidebar'
   );
 
-  protected readonly paletteActions: CommandPaletteAction[] = [
+  protected readonly paletteActions = computed<CommandPaletteAction[]>(() => [
     { id: 'check', label: 'Check for updates now', hint: '⌘R' },
     { id: 'sync', label: 'Sync Homebrew metadata', hint: 'brew update' },
+    { id: 'install-package', label: 'Install package…', hint: 'Browse catalog' },
+    { id: 'history', label: 'Go to History', hint: '/history' },
     { id: 'updates', label: 'Go to Updates', hint: '/updates' },
     { id: 'installed', label: 'Go to Installed', hint: '/installed' },
     { id: 'browse', label: 'Go to Browse', hint: '/browse' },
@@ -102,7 +105,7 @@ export class AppShellComponent {
     { id: 'services', label: 'Go to Services', hint: '/services' },
     { id: 'doctor', label: 'Go to Doctor', hint: '/doctor' },
     { id: 'settings', label: 'Go to Settings', hint: '/settings' }
-  ];
+  ]);
 
   constructor() {
     this.routePath.set(this.normalizeRoute(this.router.url));
@@ -178,6 +181,12 @@ export class AppShellComponent {
         break;
       case 'browse':
         void this.router.navigate(['/browse']);
+        break;
+      case 'install-package':
+        void this.router.navigate(['/browse']);
+        break;
+      case 'history':
+        void this.router.navigate(['/history']);
         break;
       case 'taps':
         void this.router.navigate(['/taps']);

@@ -35,6 +35,12 @@ describe('IPC channel allowlist', () => {
     expect(channels).toContain('brew:syncMetadata');
     expect(channels).toContain('settings:get');
     expect(channels).toContain('settings:update');
+    expect(channels).toContain('history:list');
+    expect(channels).toContain('history:stats');
+    expect(channels).toContain('templates:list');
+    expect(channels).toContain('templates:run');
+    expect(channels).toContain('brew:upgradeMany');
+    expect(channels).toContain('jobs:recover');
     expect(channels).toContain('updates:changed');
     expect(channels).toContain('app:windowChromeChanged');
     expect(channels).not.toContain('ipc:invoke');

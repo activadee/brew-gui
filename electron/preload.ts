@@ -1,8 +1,21 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
 import {
+  actionTemplateSchema,
   appSettingsSchema,
   appSettingsUpdateSchema,
+  appUpdateAvailableEventSchema,
+  batchJobResultSchema,
+  batchManyRequestSchema,
+  historyListRequestSchema,
+  historyListResponseSchema,
+  historyStatsSchema,
+  recoveredJobSchema,
+  templatesDeleteRequestSchema,
+  templatesRunRequestSchema,
+  templatesSaveRequestSchema,
+  uninstallImpactRequestSchema,
+  uninstallImpactResponseSchema,
   brewAvailabilitySchema,
   brewDoctorResultSchema,
   brewJobCompleteEventSchema,
@@ -197,6 +210,68 @@ const api: BrewGuiBridge = {
     return syncMetadataResultSchema.parse(payload);
   },
 
+  async getUninstallImpact(request) {
+    const parsed = uninstallImpactRequestSchema.parse(request);
+    const payload = await ipcRenderer.invoke(IPC_CHANNELS.GET_UNINSTALL_IMPACT, parsed);
+    return uninstallImpactResponseSchema.parse(payload);
+  },
+
+  async upgradeMany(request) {
+    const parsed = batchManyRequestSchema.parse(request);
+    const payload = await ipcRenderer.invoke(IPC_CHANNELS.UPGRADE_MANY, parsed);
+    return batchJobResultSchema.parse(payload);
+  },
+
+  async uninstallMany(request) {
+    const parsed = batchManyRequestSchema.parse(request);
+    const payload = await ipcRenderer.invoke(IPC_CHANNELS.UNINSTALL_MANY, parsed);
+    return batchJobResultSchema.parse(payload);
+  },
+
+  async pinMany(request) {
+    const parsed = batchManyRequestSchema.parse(request);
+    const payload = await ipcRenderer.invoke(IPC_CHANNELS.PIN_MANY, parsed);
+    return batchJobResultSchema.parse(payload);
+  },
+
+  async listTemplates() {
+    const payload = await ipcRenderer.invoke(IPC_CHANNELS.TEMPLATES_LIST);
+    return actionTemplateSchema.array().parse(payload);
+  },
+
+  async saveTemplate(request) {
+    const parsed = templatesSaveRequestSchema.parse(request);
+    const payload = await ipcRenderer.invoke(IPC_CHANNELS.TEMPLATES_SAVE, parsed);
+    return actionTemplateSchema.parse(payload);
+  },
+
+  async deleteTemplate(request) {
+    const parsed = templatesDeleteRequestSchema.parse(request);
+    await ipcRenderer.invoke(IPC_CHANNELS.TEMPLATES_DELETE, parsed);
+  },
+
+  async runTemplate(request) {
+    const parsed = templatesRunRequestSchema.parse(request);
+    const payload = await ipcRenderer.invoke(IPC_CHANNELS.TEMPLATES_RUN, parsed);
+    return brewJobCompleteEventSchema.parse(payload);
+  },
+
+  async listHistory(request) {
+    const parsed = historyListRequestSchema.parse(request ?? {});
+    const payload = await ipcRenderer.invoke(IPC_CHANNELS.HISTORY_LIST, parsed);
+    return historyListResponseSchema.parse(payload);
+  },
+
+  async getHistoryStats() {
+    const payload = await ipcRenderer.invoke(IPC_CHANNELS.HISTORY_STATS);
+    return historyStatsSchema.parse(payload);
+  },
+
+  async recoverJobs() {
+    const payload = await ipcRenderer.invoke(IPC_CHANNELS.JOBS_RECOVER);
+    return recoveredJobSchema.array().parse(payload);
+  },
+
   async getSettings() {
     const payload = await ipcRenderer.invoke(IPC_CHANNELS.GET_SETTINGS);
     return appSettingsSchema.parse(payload);
@@ -251,6 +326,15 @@ const api: BrewGuiBridge = {
 
     ipcRenderer.on(IPC_CHANNELS.EVENTS_JOB_FAILED, listener);
     return () => ipcRenderer.removeListener(IPC_CHANNELS.EVENTS_JOB_FAILED, listener);
+  },
+
+  onUpdateAvailable(handler) {
+    const listener = (_event: unknown, payload: unknown) => {
+      handler(appUpdateAvailableEventSchema.parse(payload));
+    };
+
+    ipcRenderer.on(IPC_CHANNELS.EVENTS_UPDATE_AVAILABLE, listener);
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.EVENTS_UPDATE_AVAILABLE, listener);
   }
 };
 

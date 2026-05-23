@@ -1,5 +1,12 @@
 import { z } from 'zod';
 
+export const brewTokenSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .regex(/^[A-Za-z0-9+@._/-]+$/, 'invalid package name');
+export type BrewToken = z.infer<typeof brewTokenSchema>;
+
 export const packageKindSchema = z.enum(['formula', 'cask']);
 export type PackageKind = z.infer<typeof packageKindSchema>;
 
@@ -186,6 +193,42 @@ export const quietHoursTimeSchema = z
   .string()
   .regex(/^([01]\d|2[0-3]):([0-5]\d)$/, 'time must match HH:mm');
 
+export const actionTemplateStepSchema = z.object({
+  action: z.union([
+    z.literal('install'),
+    z.literal('pin'),
+    z.literal('unpin'),
+    z.literal('upgradeOne')
+  ])
+});
+export type ActionTemplateStep = z.infer<typeof actionTemplateStepSchema>;
+
+export const actionTemplateSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string().trim().min(1).max(80),
+  steps: z.array(actionTemplateStepSchema).min(1).max(10),
+  createdAt: z.string(),
+  updatedAt: z.string()
+});
+export type ActionTemplate = z.infer<typeof actionTemplateSchema>;
+
+export const templatesSaveRequestSchema = actionTemplateSchema.omit({ createdAt: true, updatedAt: true }).extend({
+  id: z.string().uuid().optional()
+});
+export type TemplatesSaveRequest = z.infer<typeof templatesSaveRequestSchema>;
+
+export const templatesDeleteRequestSchema = z.object({
+  id: z.string().uuid()
+});
+export type TemplatesDeleteRequest = z.infer<typeof templatesDeleteRequestSchema>;
+
+export const templatesRunRequestSchema = z.object({
+  templateId: z.string().uuid(),
+  kind: packageKindSchema,
+  name: brewTokenSchema
+});
+export type TemplatesRunRequest = z.infer<typeof templatesRunRequestSchema>;
+
 export const appSettingsSchema = z.object({
   checkIntervalMinutes: z.union([z.literal(60), z.literal(360), z.literal(1440)]),
   autoCheckOnLaunch: z.boolean(),
@@ -196,7 +239,10 @@ export const appSettingsSchema = z.object({
   quietHoursEnabled: z.boolean(),
   quietHoursStart: quietHoursTimeSchema,
   quietHoursEnd: quietHoursTimeSchema,
-  defaultView: z.union([z.literal('updates'), z.literal('installed'), z.literal('browse')])
+  defaultView: z.union([z.literal('updates'), z.literal('installed'), z.literal('browse')]),
+  showAdvancedInstallOptions: z.boolean().default(false),
+  telemetryEnabled: z.boolean().default(false),
+  actionTemplates: z.array(actionTemplateSchema).max(20).default([])
 });
 export type AppSettings = z.infer<typeof appSettingsSchema>;
 
@@ -294,7 +340,8 @@ export type UpgradeOneRequest = z.infer<typeof upgradeOneRequestSchema>;
 
 export const installOneRequestSchema = z.object({
   kind: packageKindSchema,
-  name: z.string().min(1)
+  name: brewTokenSchema,
+  force: z.boolean().optional()
 });
 export type InstallOneRequest = z.infer<typeof installOneRequestSchema>;
 
@@ -493,6 +540,21 @@ export const brewJobStageSchema = z.union([
 ]);
 export type BrewJobStage = z.infer<typeof brewJobStageSchema>;
 
+export const jobSourceSchema = z.union([
+  z.literal('manual'),
+  z.literal('scheduler'),
+  z.literal('template'),
+  z.literal('batch')
+]);
+export type JobSource = z.infer<typeof jobSourceSchema>;
+
+const jobAttributionFields = {
+  source: jobSourceSchema.optional(),
+  correlationId: z.string().optional(),
+  stepIndex: z.number().int().nonnegative().optional(),
+  stepTotal: z.number().int().positive().optional()
+};
+
 export const brewJobProgressEventSchema = z.object({
   jobId: z.string(),
   action: brewJobActionSchema,
@@ -502,7 +564,8 @@ export const brewJobProgressEventSchema = z.object({
   message: z.string(),
   packageName: z.string().nullable(),
   kind: brewJobKindSchema,
-  timestamp: z.string()
+  timestamp: z.string(),
+  ...jobAttributionFields
 });
 export type BrewJobProgressEvent = z.infer<typeof brewJobProgressEventSchema>;
 
@@ -516,7 +579,8 @@ export const brewJobCompleteEventSchema = z.object({
   exitCode: z.number().int(),
   durationMs: z.number().int().nonnegative(),
   output: z.string(),
-  timestamp: z.string()
+  timestamp: z.string(),
+  ...jobAttributionFields
 });
 export type BrewJobCompleteEvent = z.infer<typeof brewJobCompleteEventSchema>;
 
@@ -530,9 +594,123 @@ export const brewJobFailedEventSchema = z.object({
   durationMs: z.number().int().nonnegative(),
   error: z.string(),
   output: z.string(),
-  timestamp: z.string()
+  timestamp: z.string(),
+  ...jobAttributionFields
 });
 export type BrewJobFailedEvent = z.infer<typeof brewJobFailedEventSchema>;
+
+export const jobHistoryStatusSchema = z.union([z.literal('succeeded'), z.literal('failed')]);
+export type JobHistoryStatus = z.infer<typeof jobHistoryStatusSchema>;
+
+export const jobHistoryRecordSchema = z.object({
+  jobId: z.string(),
+  action: brewJobActionSchema,
+  packageName: z.string().nullable(),
+  kind: brewJobKindSchema.nullable(),
+  status: jobHistoryStatusSchema,
+  command: z.string(),
+  exitCode: z.number().int().nullable(),
+  durationMs: z.number().int().nonnegative(),
+  error: z.string().nullable(),
+  source: jobSourceSchema,
+  startedAt: z.string(),
+  completedAt: z.string(),
+  outputTail: z.string().nullable().optional()
+});
+export type JobHistoryRecord = z.infer<typeof jobHistoryRecordSchema>;
+
+export const historyListRequestSchema = z.object({
+  page: z.number().int().min(1).default(1),
+  pageSize: z.number().int().min(1).max(100).default(50),
+  action: brewJobActionSchema.optional(),
+  status: jobHistoryStatusSchema.optional(),
+  since: z.string().optional()
+});
+export type HistoryListRequest = z.infer<typeof historyListRequestSchema>;
+
+export const historyListResponseSchema = z.object({
+  items: z.array(jobHistoryRecordSchema),
+  total: z.number().int().nonnegative(),
+  page: z.number().int().min(1),
+  pageSize: z.number().int().min(1)
+});
+export type HistoryListResponse = z.infer<typeof historyListResponseSchema>;
+
+export const historyStatsSchema = z.object({
+  totalJobs: z.number().int().nonnegative(),
+  successRate: z.number().min(0).max(1),
+  medianDurationMs: z.number().int().nonnegative(),
+  last7Days: z.object({
+    total: z.number().int().nonnegative(),
+    succeeded: z.number().int().nonnegative(),
+    failed: z.number().int().nonnegative()
+  }),
+  failureRateByAction: z.array(
+    z.object({
+      action: brewJobActionSchema,
+      total: z.number().int().nonnegative(),
+      failed: z.number().int().nonnegative(),
+      failureRate: z.number().min(0).max(1)
+    })
+  )
+});
+export type HistoryStats = z.infer<typeof historyStatsSchema>;
+
+export const batchPackageRequestSchema = z.object({
+  kind: packageKindSchema,
+  name: brewTokenSchema
+});
+export type BatchPackageRequest = z.infer<typeof batchPackageRequestSchema>;
+
+export const batchManyRequestSchema = z.object({
+  items: z.array(batchPackageRequestSchema).min(1).max(50)
+});
+export type BatchManyRequest = z.infer<typeof batchManyRequestSchema>;
+
+export const batchJobItemResultSchema = z.object({
+  kind: packageKindSchema,
+  name: z.string(),
+  success: z.boolean(),
+  jobId: z.string(),
+  error: z.string().nullable()
+});
+export type BatchJobItemResult = z.infer<typeof batchJobItemResultSchema>;
+
+export const batchJobResultSchema = z.object({
+  results: z.array(batchJobItemResultSchema),
+  succeeded: z.number().int().nonnegative(),
+  failed: z.number().int().nonnegative()
+});
+export type BatchJobResult = z.infer<typeof batchJobResultSchema>;
+
+export const uninstallImpactRequestSchema = z.object({
+  kind: packageKindSchema,
+  name: brewTokenSchema
+});
+export type UninstallImpactRequest = z.infer<typeof uninstallImpactRequestSchema>;
+
+export const uninstallImpactResponseSchema = z.object({
+  dependents: z.array(z.string()),
+  note: z.string().nullable()
+});
+export type UninstallImpactResponse = z.infer<typeof uninstallImpactResponseSchema>;
+
+export const recoveredJobSchema = z.object({
+  jobId: z.string(),
+  action: brewJobActionSchema,
+  command: z.string(),
+  packageName: z.string().nullable(),
+  kind: brewJobKindSchema,
+  stage: z.union([z.literal('queued'), z.literal('running')]),
+  startedAt: z.string()
+});
+export type RecoveredJob = z.infer<typeof recoveredJobSchema>;
+
+export const appUpdateAvailableEventSchema = z.object({
+  version: z.string(),
+  releaseNotes: z.string().nullable()
+});
+export type AppUpdateAvailableEvent = z.infer<typeof appUpdateAvailableEventSchema>;
 
 export interface BrewGuiBridge {
   openMainWindow(): Promise<void>;
@@ -550,8 +728,12 @@ export interface BrewGuiBridge {
   installOne(request: InstallOneRequest): Promise<BrewJobCompleteEvent>;
   reinstallOne(request: ReinstallOneRequest): Promise<BrewJobCompleteEvent>;
   uninstallOne(request: UninstallOneRequest): Promise<BrewJobCompleteEvent>;
+  getUninstallImpact(request: UninstallImpactRequest): Promise<UninstallImpactResponse>;
   pinOne(request: PinOneRequest): Promise<BrewJobCompleteEvent>;
   unpinOne(request: UnpinOneRequest): Promise<BrewJobCompleteEvent>;
+  upgradeMany(request: BatchManyRequest): Promise<BatchJobResult>;
+  uninstallMany(request: BatchManyRequest): Promise<BatchJobResult>;
+  pinMany(request: BatchManyRequest): Promise<BatchJobResult>;
   tapAdd(request: TapAddRequest): Promise<BrewJobCompleteEvent>;
   tapRemove(request: TapRemoveRequest): Promise<BrewJobCompleteEvent>;
   serviceStart(request: ServiceRequest): Promise<BrewJobCompleteEvent>;
@@ -564,6 +746,13 @@ export interface BrewGuiBridge {
   runCleanup(): Promise<BrewJobCompleteEvent>;
   checkNow(): Promise<CheckNowResult>;
   syncMetadata(): Promise<SyncMetadataResult>;
+  listTemplates(): Promise<ActionTemplate[]>;
+  saveTemplate(request: TemplatesSaveRequest): Promise<ActionTemplate>;
+  deleteTemplate(request: TemplatesDeleteRequest): Promise<void>;
+  runTemplate(request: TemplatesRunRequest): Promise<BrewJobCompleteEvent>;
+  listHistory(request: HistoryListRequest): Promise<HistoryListResponse>;
+  getHistoryStats(): Promise<HistoryStats>;
+  recoverJobs(): Promise<RecoveredJob[]>;
   getSettings(): Promise<AppSettings>;
   updateSettings(update: AppSettingsUpdate): Promise<AppSettings>;
   onUpdatesChanged(handler: (event: UpdatesChangedEvent) => void): () => void;
@@ -571,6 +760,7 @@ export interface BrewGuiBridge {
   onJobProgress(handler: (event: BrewJobProgressEvent) => void): () => void;
   onJobComplete(handler: (event: BrewJobCompleteEvent) => void): () => void;
   onJobFailed(handler: (event: BrewJobFailedEvent) => void): () => void;
+  onUpdateAvailable(handler: (event: AppUpdateAvailableEvent) => void): () => void;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -583,7 +773,10 @@ export const DEFAULT_SETTINGS: AppSettings = {
   quietHoursEnabled: false,
   quietHoursStart: '22:00',
   quietHoursEnd: '07:00',
-  defaultView: 'updates'
+  defaultView: 'updates',
+  showAdvancedInstallOptions: false,
+  telemetryEnabled: false,
+  actionTemplates: []
 };
 
 export const DEFAULT_WINDOW_CHROME_STATE: WindowChromeState = {

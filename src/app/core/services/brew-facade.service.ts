@@ -1,8 +1,20 @@
 import { Injectable, inject } from '@angular/core';
 
 import type {
+  ActionTemplate,
   AppSettings,
   AppSettingsUpdate,
+  BatchJobResult,
+  BatchManyRequest,
+  HistoryListRequest,
+  HistoryListResponse,
+  HistoryStats,
+  RecoveredJob,
+  TemplatesDeleteRequest,
+  TemplatesRunRequest,
+  TemplatesSaveRequest,
+  UninstallImpactRequest,
+  UninstallImpactResponse,
   BrewAvailability,
   BrewDoctorResult,
   BrewJobCompleteEvent,
@@ -101,6 +113,50 @@ export class BrewFacadeService {
 
   uninstallOne(request: UninstallOneRequest): Promise<BrewJobCompleteEvent> {
     return this.bridge.api.uninstallOne(request);
+  }
+
+  getUninstallImpact(request: UninstallImpactRequest): Promise<UninstallImpactResponse> {
+    return this.bridge.api.getUninstallImpact(request);
+  }
+
+  upgradeMany(request: BatchManyRequest): Promise<BatchJobResult> {
+    return this.bridge.api.upgradeMany(request);
+  }
+
+  uninstallMany(request: BatchManyRequest): Promise<BatchJobResult> {
+    return this.bridge.api.uninstallMany(request);
+  }
+
+  pinMany(request: BatchManyRequest): Promise<BatchJobResult> {
+    return this.bridge.api.pinMany(request);
+  }
+
+  listTemplates(): Promise<ActionTemplate[]> {
+    return this.bridge.api.listTemplates();
+  }
+
+  saveTemplate(request: TemplatesSaveRequest): Promise<ActionTemplate> {
+    return this.bridge.api.saveTemplate(request);
+  }
+
+  deleteTemplate(request: TemplatesDeleteRequest): Promise<void> {
+    return this.bridge.api.deleteTemplate(request);
+  }
+
+  runTemplate(request: TemplatesRunRequest): Promise<BrewJobCompleteEvent> {
+    return this.bridge.api.runTemplate(request);
+  }
+
+  listHistory(request: HistoryListRequest): Promise<HistoryListResponse> {
+    return this.bridge.api.listHistory(request);
+  }
+
+  getHistoryStats(): Promise<HistoryStats> {
+    return this.bridge.api.getHistoryStats();
+  }
+
+  recoverJobs(): Promise<RecoveredJob[]> {
+    return this.bridge.api.recoverJobs();
   }
 
   pinOne(request: PinOneRequest): Promise<BrewJobCompleteEvent> {

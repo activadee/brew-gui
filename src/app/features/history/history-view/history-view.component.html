@@ -1,0 +1,69 @@
+<section class="space-y-4 p-4">
+  <header class="space-y-1">
+    <h2 class="text-lg font-semibold">History</h2>
+    <p class="text-sm text-muted-foreground">Durable brew operation timeline with lightweight analytics.</p>
+  </header>
+
+  @if (historyStore.stats(); as stats) {
+    <div class="grid gap-3 sm:grid-cols-3">
+      <z-card class="p-3">
+        <p class="text-xs text-muted-foreground">Success rate</p>
+        <p class="text-2xl font-semibold">{{ historyStore.successRatePercent() }}%</p>
+      </z-card>
+      <z-card class="p-3">
+        <p class="text-xs text-muted-foreground">Median duration</p>
+        <p class="text-2xl font-semibold">{{ stats.medianDurationMs }}ms</p>
+      </z-card>
+      <z-card class="p-3">
+        <p class="text-xs text-muted-foreground">Last 7 days</p>
+        <p class="text-2xl font-semibold">{{ stats.last7Days.total }} jobs</p>
+      </z-card>
+    </div>
+  }
+
+  @if (historyStore.error(); as error) {
+    <app-diagnostic-panel title="History unavailable" [message]="error" />
+  } @else if (historyStore.loading()) {
+    <p class="text-sm text-muted-foreground">Loading history…</p>
+  } @else if (historyStore.items().length === 0) {
+    <app-diagnostic-panel
+      title="No history yet"
+      message="Completed brew jobs will appear here after you run install, upgrade, or uninstall actions."
+    />
+  } @else {
+    <div class="space-y-2">
+      @for (record of historyStore.items(); track record.jobId) {
+        <z-card class="cursor-pointer p-3 hover:bg-muted/40" (click)="showOutput(record.outputTail)">
+          <div class="flex items-center justify-between gap-2">
+            <div class="min-w-0">
+              <p class="truncate text-sm font-medium">{{ record.packageName ?? record.action }}</p>
+              <p class="text-xs text-muted-foreground">
+                {{ formatDay(record.completedAt) }} · {{ record.command }}
+              </p>
+            </div>
+            <div class="flex items-center gap-2">
+              <z-badge [zType]="record.status === 'succeeded' ? 'success' : 'destructive'">
+                {{ record.status }}
+              </z-badge>
+              <span class="text-xs text-muted-foreground">{{ record.durationMs }}ms</span>
+            </div>
+          </div>
+        </z-card>
+      }
+    </div>
+
+    <div class="flex justify-end">
+      <z-button zType="secondary" (click)="historyStore.load(historyStore.page() + 1)">Load more</z-button>
+    </div>
+  }
+
+  @if (selectedOutput(); as output) {
+    <z-card class="p-3">
+      <div class="mb-2 flex items-center justify-between">
+        <h3 class="text-sm font-semibold">Output</h3>
+        <z-button zType="ghost" zSize="sm" (click)="selectedOutput.set(null)">Close</z-button>
+      </div>
+      <pre class="max-h-64 overflow-auto whitespace-pre-wrap text-xs">{{ output }}</pre>
+    </z-card>
+  }
+</section>

@@ -14,8 +14,14 @@ import { IPC_CHANNELS } from './ipc-channels';
 import { registerIpcHandlers } from './ipc';
 import { configureAutoUpdate } from './services/auto-update';
 import { BackgroundScheduler, type UpdateCheckTrigger } from './services/background-scheduler';
+import { ActionTemplateRunner } from './services/action-template-runner';
+import { ActionTemplatesStore } from './services/action-templates-store';
+import { ActiveJobsStore } from './services/active-jobs-store';
 import { HomebrewService, type JobEventSink } from './services/homebrew-service';
+import { JobEventBridge } from './services/job-event-bridge';
+import { JobHistoryStore } from './services/job-history-store';
 import { SettingsStore } from './services/settings-store';
+import { TelemetryStore } from './services/telemetry-store';
 import { TrayAlertController } from './services/tray-alert-controller';
 import { log } from './utils/logger';
 
@@ -29,7 +35,12 @@ let isQuitting = false;
 
 const settingsStore = new SettingsStore();
 const homebrewService = new HomebrewService();
-const jobEventSink: JobEventSink = {
+const historyStore = new JobHistoryStore();
+const activeJobsStore = new ActiveJobsStore();
+const telemetryStore = new TelemetryStore();
+const templatesStore = new ActionTemplatesStore(settingsStore);
+
+const innerJobEventSink: JobEventSink = {
   onProgress: (event) => {
     emitRendererEvent(IPC_CHANNELS.EVENTS_JOB_PROGRESS, event);
   },
@@ -40,6 +51,16 @@ const jobEventSink: JobEventSink = {
     emitRendererEvent(IPC_CHANNELS.EVENTS_JOB_FAILED, event);
   }
 };
+
+const jobEventSink = new JobEventBridge({
+  inner: innerJobEventSink,
+  historyStore,
+  activeJobsStore,
+  telemetryStore
+});
+
+const templateRunner = new ActionTemplateRunner(templatesStore, homebrewService, jobEventSink);
+telemetryStore.setEnabled(settingsStore.getSettings().telemetryEnabled);
 
 const trayAlertController = new TrayAlertController({
   onFlushMutedCount: (count) => {
@@ -394,6 +415,12 @@ function registerHandlers(): void {
   registerIpcHandlers({
     homebrew: homebrewService,
     settingsStore,
+    templatesStore,
+    templateRunner,
+    historyStore,
+    activeJobsStore,
+    telemetryStore,
+    jobSink: jobEventSink,
     onSettingsChanged: (settings) => {
       backgroundScheduler.onSettingsChanged(settings);
       trayAlertController.updateSettings(settings);
@@ -426,7 +453,9 @@ async function bootstrap(): Promise<void> {
   trayAlertController.updateSettings(settings);
 
   registerHandlers();
-  configureAutoUpdate();
+  configureAutoUpdate((event) => {
+    emitRendererEvent(IPC_CHANNELS.EVENTS_UPDATE_AVAILABLE, event);
+  });
   backgroundScheduler.start(settings);
   emitWindowChromeChanged();
 

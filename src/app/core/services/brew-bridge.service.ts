@@ -298,6 +298,56 @@ const createFallbackBridge = (): BrewGuiBridge => ({
       syncedAt: new Date().toISOString()
     };
   },
+  async getUninstallImpact() {
+    return { dependents: [], note: null };
+  },
+  async upgradeMany() {
+    return { results: [], succeeded: 0, failed: 0 };
+  },
+  async uninstallMany() {
+    return { results: [], succeeded: 0, failed: 0 };
+  },
+  async pinMany() {
+    return { results: [], succeeded: 0, failed: 0 };
+  },
+  async listTemplates() {
+    return [];
+  },
+  async saveTemplate(request) {
+    return {
+      id: request.id ?? crypto.randomUUID(),
+      name: request.name,
+      steps: request.steps,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+  },
+  async deleteTemplate() {
+    return undefined;
+  },
+  async runTemplate(request) {
+    return createFallbackJobCompleteEvent({
+      action: 'install',
+      command: `template ${request.templateId}`,
+      kind: request.kind,
+      packageName: request.name
+    });
+  },
+  async listHistory() {
+    return { items: [], total: 0, page: 1, pageSize: 50 };
+  },
+  async getHistoryStats() {
+    return {
+      totalJobs: 0,
+      successRate: 1,
+      medianDurationMs: 0,
+      last7Days: { total: 0, succeeded: 0, failed: 0 },
+      failureRateByAction: []
+    };
+  },
+  async recoverJobs() {
+    return [];
+  },
   async getSettings() {
     return DEFAULT_SETTINGS;
   },
@@ -317,6 +367,9 @@ const createFallbackBridge = (): BrewGuiBridge => ({
     return () => undefined;
   },
   onJobFailed(_handler: (event: BrewJobFailedEvent) => void) {
+    return () => undefined;
+  },
+  onUpdateAvailable() {
     return () => undefined;
   }
 });
