@@ -59,14 +59,14 @@ Brew Sidebar becomes the safest and fastest desktop control plane for Homebrew: 
 - [x] Scheduled jobs (completed February 26, 2026):
   - Scheduled update checks, cleanup, and metadata sync.
   - Quiet hours and notification windows.
-- Smart upgrade strategy:
+- [x] Smart upgrade strategy (completed May 23, 2026):
   - Batch upgrades by risk level.
   - Exclude pinned or user-blocked packages.
-- Update channels:
+- [x] Update channels (completed May 23, 2026):
   - Separate critical, security-related, and normal update views.
-- Action templates:
+- [x] Action templates (completed May 23, 2026):
   - Save reusable command presets (for example: install + pin).
-- Local history and analytics:
+- [x] Local history and analytics (completed May 23, 2026):
   - Track upgrade/install/uninstall timeline.
   - Time-to-complete and failure-rate insights.
 

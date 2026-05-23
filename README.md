@@ -5,8 +5,10 @@ Minimalistic macOS Electron wrapper around Homebrew with Angular 21, Tailwind CS
 ## Features
 
 - Installed package inventory for formulae and casks
-- Outdated package detection with upgrade actions (`upgrade one`, `upgrade all`)
+- Outdated package detection with upgrade actions (`upgrade one`, `upgrade all`, smart upgrade)
+- Update channels (critical, security, normal)
 - Catalog browsing backed by Homebrew API + local cache fallback
+- Action templates, job history, and batch multi-select actions
 - Tray popover with update count, interval settings, and quick actions
 - Typed, validated IPC boundary between renderer and Electron main process
 
@@ -54,28 +56,46 @@ Outputs are generated in `release/`.
 
 - `https://example.com/auto-updates/`
 
-Replace this and provide signing/notarization secrets in CI before enabling release auto-updates.
+Replace this and provide signing/notarization secrets in CI before enabling release auto-updates. Set `ENABLE_AUTO_UPDATES=1` in packaged builds to enable the updater.
+
+### Signing (release tags)
+
+Documented environment variables for macOS release:
+
+- `CSC_LINK` — code signing certificate
+- `CSC_KEY_PASSWORD` — certificate password
+- `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID` — notarization
 
 ## IPC contract
 
 Main channels (request-response):
 
-- `brew:getInstalled`
-- `brew:getOutdated`
+- `app:openMain`, `app:windowControl`, `app:getWindowChrome`
+- `brew:getAvailability`, `brew:getInstalled`, `brew:getOutdated`
+- `brew:getTaps`, `brew:getServices`, `brew:getPackageDetails`
 - `brew:searchCatalog`
-- `brew:upgradeOne`
-- `brew:upgradeAll`
-- `brew:checkNow`
-- `settings:get`
-- `settings:update`
+- `brew:installOne`, `brew:reinstallOne`, `brew:uninstallOne`
+- `brew:pinOne`, `brew:unpinOne`
+- `brew:upgradeOne`, `brew:upgradeAll`, `brew:getSmartUpgradePlan`, `brew:upgradeSmart`
+- `brew:upgradeMany`, `brew:uninstallMany`, `brew:pinMany`
+- `brew:getUninstallImpact`
+- `brew:tapAdd`, `brew:tapRemove`
+- `brew:serviceStart`, `brew:serviceStop`, `brew:serviceRestart`
+- `brew:cleanupPreview`, `brew:cleanupRun`, `brew:doctorRun`
+- `brew:checkNow`, `brew:syncMetadata`
+- `templates:list`, `templates:save`, `templates:delete`, `templates:run`
+- `history:list`, `history:stats`
+- `jobs:recover`
+- `settings:get`, `settings:update`
 
 Event channels:
 
 - `updates:changed`
-- `brew:job-progress`
-- `brew:job-complete`
-- `brew:job-failed`
+- `app:windowChromeChanged`
+- `brew:job-progress`, `brew:job-complete`, `brew:job-failed`
+- `app:updateAvailable` (packaged builds with auto-update enabled)
 
 All contracts are defined in:
 
 - `src/shared/contracts.ts`
+- Channel names in `electron/ipc-channels.ts`
