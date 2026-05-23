@@ -1,6 +1,6 @@
 {
   "name": "brew-gui",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Minimalistic Homebrew sidebar desktop app",
   "private": true,
   "packageManager": "npm@10.9.2",
