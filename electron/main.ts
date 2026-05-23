@@ -383,7 +383,7 @@ async function loadRenderer(window: BrowserWindow, route: string): Promise<void>
     return;
   }
 
-  const rendererPath = path.join(__dirname, '../dist/brew-gui/browser/index.html');
+  const rendererPath = path.join(app.getAppPath(), 'dist/brew-gui/browser/index.html');
   await window.loadFile(rendererPath, {
     hash: normalizedRoute.replace(/^\//, '')
   });
