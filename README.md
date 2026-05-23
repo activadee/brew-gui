@@ -54,11 +54,30 @@ Outputs are generated in `release/`.
 
 ## GitHub Release (unsigned)
 
-Pushing a version tag builds unsigned macOS artifacts on GitHub Actions and publishes them to a GitHub Release (DMG for manual install, ZIP + `latest-mac.yml` for in-app auto-update):
+Pushing a version tag (`v*`) runs the **Release** workflow: unsigned macOS DMG + ZIP, published to GitHub Releases for manual install and in-app auto-update.
+
+`main` is branch-protected, so you cannot run `npm version` and `git push` to `main` from your machine anymore. Use one of these flows:
+
+### Option A — Release bump workflow (recommended)
+
+1. Merge your changes to `main` via PR (CI must pass).
+2. In GitHub **Actions → Release bump → Run workflow**, choose `patch`, `minor`, or `major`.
+3. The workflow bumps `package.json`, commits to `main`, creates `vX.Y.Z`, and pushes the tag.
+4. The **Release** workflow runs automatically on that tag.
+
+### Option B — Manual bump PR + tag push
+
+1. On a branch: `npm version patch --no-git-tag-version` (updates `package.json` and `package-lock.json` only).
+2. Open a PR to `main` and merge.
+3. On updated `main`: `npm run release:tag` (creates and pushes `vX.Y.Z` from `package.json`; does not push commits).
+
+### Legacy tag-only push
+
+If `package.json` on `main` already has the right version:
 
 ```bash
-git tag v0.5.0
-git push origin v0.5.0
+git checkout main && git pull
+npm run release:tag
 ```
 
 You can also run the **Release** workflow manually from the Actions tab (`workflow_dispatch`); artifacts are uploaded to the workflow run only (no GitHub Release unless you push a tag).

@@ -21,7 +21,8 @@
     "test:all": "npm run test && npm run test:node",
     "package:mac": "npm run build && electron-builder --mac",
     "package:mac:publish": "npm run build && electron-builder --mac --publish always",
-    "package:dir": "npm run build && electron-builder --dir"
+    "package:dir": "npm run build && electron-builder --dir",
+    "release:tag": "node scripts/push-release-tag.mjs"
   },
   "prettier": {
     "printWidth": 100,

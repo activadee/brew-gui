@@ -1,0 +1,41 @@
+name: Release bump
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: Semver bump
+        required: true
+        type: choice
+        default: patch
+        options:
+          - patch
+          - minor
+          - major
+
+permissions:
+  contents: write
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Bump version, commit, and tag
+        run: npm version ${{ inputs.bump }} -m "chore(release): %s"
+
+      - name: Push version commit and tag to main
+        run: git push origin HEAD:main --follow-tags
