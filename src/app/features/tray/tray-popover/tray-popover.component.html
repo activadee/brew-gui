@@ -1,36 +1,60 @@
+<div class="brew-shell brew-tray-shell ui-shell-enter h-full">
+  <header class="brew-titlebar brew-titlebar-compact brew-tray-titlebar window-titlebar">
+    <div class="brew-titlebar-left">
+      <span class="brew-titlebar-app">Brewdeck</span>
+    </div>
 
-    <main class="h-full p-2">
-      <z-card class="flex h-full flex-col gap-3 border-border/70 bg-card/95 shadow-xl">
-        <header class="flex items-center justify-between">
-          <h2 class="text-base font-semibold">Brewdeck</h2>
-          <z-badge zType="secondary" zShape="pill">{{ updatesStore.updateCount() }}</z-badge>
-        </header>
+    <div class="brew-titlebar-center">
+      <span class="brew-tray-status-badge">
+        @if (updatesStore.updateCount() > 0) {
+          {{ updatesStore.updateCount() }} updates
+        } @else {
+          Up to date
+        }
+      </span>
+    </div>
 
-        <p class="text-sm text-muted-foreground">
-          @if (updatesStore.updateCount() > 0) {
-            {{ updatesStore.updateCount() }} updates are available.
-          } @else {
-            No updates currently pending.
-          }
-        </p>
+    <div class="brew-titlebar-right no-drag">
+      <button type="button" z-button zType="ghost" zSize="sm" class="brew-tray-check-now no-drag" (click)="checkNow()">
+        Check now
+      </button>
+    </div>
+  </header>
 
-        <section class="space-y-1.5">
-          <p class="text-sm font-medium">Check interval</p>
-          <z-segmented
-            zSize="sm"
-            [zOptions]="intervalOptions"
-            [ngModel]="selectedInterval()"
-            (ngModelChange)="onIntervalChange($event)"
-            zAriaLabel="Tray check interval"
-          />
-        </section>
+  <section class="brew-tray-status-row">
+    <app-connection-status-pill
+      class="brew-tray-connection-pill"
+      [available]="appStatusStore.availability()?.available ?? false"
+      [version]="appStatusStore.availability()?.version ?? null"
+    />
 
-        <div class="mt-auto flex gap-1.5">
-          <button type="button" z-button zType="outline" zSize="sm" (click)="updatesStore.checkNow()">
-            Check now
-          </button>
-          <button type="button" z-button zSize="sm" (click)="openMain()">Open app</button>
-        </div>
-      </z-card>
-    </main>
-  
+    <div class="brew-tray-last-check">
+      <span class="brew-tray-last-check-label">Last check</span>
+      <time class="brew-tray-last-check-time mono">{{ lastCheckTime() }}</time>
+    </div>
+  </section>
+
+  <section class="brew-tray-content">
+    <p class="brew-tray-status-message">
+      @if (updatesStore.updateCount() > 0) {
+        {{ updatesStore.updateCount() }} updates are available.
+      } @else {
+        No updates currently pending.
+      }
+    </p>
+
+    <div class="brew-tray-interval">
+      <p class="brew-tray-interval-label">Check interval</p>
+      <z-segmented
+        class="brew-tray-segmented"
+        zSize="sm"
+        [zOptions]="intervalOptions"
+        [ngModel]="selectedInterval()"
+        (ngModelChange)="onIntervalChange($event)"
+        zAriaLabel="Tray check interval"
+      />
+    </div>
+
+    <button type="button" z-button class="brew-tray-open-btn w-full" (click)="openMain()">Open app</button>
+  </section>
+</div>

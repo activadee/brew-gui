@@ -201,7 +201,6 @@ export class AppShellComponent {
   constructor() {
     this.routePath.set(this.normalizeRoute(this.router.url));
     void this.initialize();
-    this.bindSystemTheme();
     void this.refreshWindowChromeState();
     this.registerRouterTracking();
     this.registerEventBridges();
@@ -532,25 +531,6 @@ export class AppShellComponent {
     } catch (error) {
       this.toast.push((error as Error).message, 'error');
     }
-  }
-
-  private bindSystemTheme(): void {
-    if (typeof window === 'undefined' || !window.matchMedia) {
-      return;
-    }
-
-    const media = window.matchMedia('(prefers-color-scheme: dark)');
-    const apply = (matches: boolean): void => {
-      document.documentElement.classList.toggle('dark', matches);
-    };
-
-    apply(media.matches);
-    const handler = (event: MediaQueryListEvent): void => {
-      apply(event.matches);
-    };
-
-    media.addEventListener('change', handler);
-    this.destroyRef.onDestroy(() => media.removeEventListener('change', handler));
   }
 
   private registerRouterTracking(): void {

@@ -6,6 +6,7 @@ import {
   Menu,
   Tray,
   nativeImage,
+  nativeTheme,
   type BrowserWindowConstructorOptions
 } from 'electron';
 
@@ -27,6 +28,25 @@ import { log } from './utils/logger';
 
 const isDev = !app.isPackaged || Boolean(process.env.ELECTRON_START_URL);
 const isDarwin = process.platform === 'darwin';
+
+const WINDOW_BACKGROUND = {
+  light: '#ececef',
+  dark: '#252525'
+} as const;
+
+function resolveWindowBackgroundColor(): string {
+  return nativeTheme.shouldUseDarkColors ? WINDOW_BACKGROUND.dark : WINDOW_BACKGROUND.light;
+}
+
+function syncWindowBackgroundColors(): void {
+  const backgroundColor = resolveWindowBackgroundColor();
+
+  for (const window of [mainWindow, trayWindow]) {
+    if (window && !window.isDestroyed()) {
+      window.setBackgroundColor(backgroundColor);
+    }
+  }
+}
 
 let mainWindow: BrowserWindow | null = null;
 let trayWindow: BrowserWindow | null = null;
@@ -125,7 +145,7 @@ function createMainWindow(): BrowserWindow {
     minWidth: 880,
     minHeight: 620,
     title: 'Brewdeck',
-    backgroundColor: '#ececef',
+    backgroundColor: resolveWindowBackgroundColor(),
     autoHideMenuBar: true,
     skipTaskbar: false,
     frame: true,
@@ -196,14 +216,14 @@ function createMainWindow(): BrowserWindow {
 function createTrayWindow(): BrowserWindow {
   const windowOptions: BrowserWindowConstructorOptions = {
     width: 380,
-    height: 420,
+    height: 480,
     frame: false,
     resizable: false,
     movable: false,
     show: false,
     alwaysOnTop: true,
     skipTaskbar: true,
-    backgroundColor: '#ececef',
+    backgroundColor: resolveWindowBackgroundColor(),
     webPreferences: {
       preload: preloadPath,
       contextIsolation: true,
@@ -446,6 +466,10 @@ function registerHandlers(): void {
 }
 
 async function bootstrap(): Promise<void> {
+  nativeTheme.on('updated', () => {
+    syncWindowBackgroundColors();
+  });
+
   mainWindow = createMainWindow();
   trayWindow = createTrayWindow();
   tray = createTray();

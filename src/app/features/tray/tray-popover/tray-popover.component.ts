@@ -1,17 +1,17 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, DestroyRef, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
-import { ZardBadgeComponent } from '@/shared/components/badge';
 import { ZardButtonComponent } from '@/shared/components/button';
-import { ZardCardComponent } from '@/shared/components/card';
 import { ZardSegmentedComponent, type SegmentedOption } from '@/shared/components/segmented';
+import { ConnectionStatusPillComponent } from '../../../components/polish/connection-status-pill/connection-status-pill.component';
 import { BrewFacadeService } from '../../../core/services/brew-facade.service';
+import { AppStatusStore } from '../../../core/stores/app-status.store';
 import { SettingsStore } from '../../../core/stores/settings.store';
 import { UpdatesStore } from '../../../core/stores/updates.store';
 
 @Component({
   selector: 'app-tray-popover',
-  imports: [FormsModule, ZardCardComponent, ZardBadgeComponent, ZardButtonComponent, ZardSegmentedComponent],
+  imports: [FormsModule, ZardButtonComponent, ZardSegmentedComponent, ConnectionStatusPillComponent],
   templateUrl: './tray-popover.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './tray-popover.component.css',
@@ -19,6 +19,7 @@ import { UpdatesStore } from '../../../core/stores/updates.store';
 export class TrayPopoverComponent {
   protected readonly updatesStore = inject(UpdatesStore);
   protected readonly settingsStore = inject(SettingsStore);
+  protected readonly appStatusStore = inject(AppStatusStore);
   private readonly destroyRef = inject(DestroyRef);
 
   private readonly facade = inject(BrewFacadeService);
@@ -26,12 +27,30 @@ export class TrayPopoverComponent {
   protected readonly intervalOptions: SegmentedOption[] = [
     { value: '60', label: '1h' },
     { value: '360', label: '6h' },
-    { value: '1440', label: '24h' }
+    { value: '1440', label: '24h' },
   ];
+
+  protected readonly lastCheckTime = computed(() => {
+    const checkedAt = this.updatesStore.lastCheckedAt();
+    if (!checkedAt) {
+      return '—:—:—';
+    }
+
+    const date = new Date(checkedAt);
+    if (Number.isNaN(date.getTime())) {
+      return '—:—:—';
+    }
+
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const seconds = String(date.getSeconds()).padStart(2, '0');
+    return `${hours}:${minutes}:${seconds}`;
+  });
 
   constructor() {
     void this.settingsStore.load();
     void this.updatesStore.refresh();
+    void this.appStatusStore.initialize();
 
     const unsubscribe = this.facade.onUpdatesChanged((event) => {
       this.updatesStore.setExternalUpdate(event);
@@ -52,6 +71,10 @@ export class TrayPopoverComponent {
     }
 
     await this.settingsStore.update({ checkIntervalMinutes: parsed });
+  }
+
+  protected async checkNow(): Promise<void> {
+    await this.updatesStore.checkNow();
   }
 
   protected async openMain(): Promise<void> {

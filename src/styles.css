@@ -155,6 +155,8 @@
     --app-titlebar-height: 44px;
     --app-sidebar-width: 236px;
     --app-surface-radius: 12px;
+    --brew-tray-divider: var(--border);
+    --brew-tray-surface-radius: 16px;
   }
 
   html,
@@ -225,6 +227,50 @@
     border-bottom: 1px solid color-mix(in oklab, var(--border) 86%, transparent);
     background: color-mix(in oklab, var(--card) 94%, transparent);
     backdrop-filter: saturate(140%) blur(16px);
+  }
+
+  .window-titlebar {
+    border-bottom-color: color-mix(in oklab, var(--border) 70%, transparent);
+    background: color-mix(in oklab, var(--card) 90%, transparent);
+    backdrop-filter: saturate(130%) blur(12px);
+  }
+
+  .brew-titlebar-compact {
+    height: 40px;
+    padding: 0 8px;
+    gap: 6px;
+  }
+
+  .brew-titlebar-compact .brew-titlebar-app {
+    font-size: 12px;
+  }
+
+  .brew-titlebar-compact .brew-titlebar-route {
+    font-size: 9px;
+  }
+
+  .brew-tray-shell {
+    border-radius: var(--brew-tray-surface-radius);
+    overflow: hidden;
+    background: var(--card);
+    border: 1px solid color-mix(in oklab, var(--border) 80%, transparent);
+    box-shadow: 0 8px 28px color-mix(in oklab, var(--foreground) 8%, transparent);
+  }
+
+  .brew-tray-shell.brew-shell {
+    background: var(--card);
+  }
+
+  .brew-tray-titlebar {
+    background: var(--card);
+    backdrop-filter: none;
+    border-bottom: 1px solid var(--brew-tray-divider);
+  }
+
+  .brew-tray-titlebar.window-titlebar {
+    background: var(--card);
+    backdrop-filter: none;
+    border-bottom-color: var(--brew-tray-divider);
   }
 
   .brew-titlebar-unfocused {
