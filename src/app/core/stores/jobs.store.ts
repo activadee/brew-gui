@@ -241,6 +241,15 @@ export const JobsStore = signalStore(
       patchState(store, { query });
     },
 
+    resetFilters(): void {
+      patchState(store, {
+        statusFilter: 'all',
+        actionFilter: 'all',
+        kindFilter: 'all',
+        query: ''
+      });
+    },
+
     closeDrawer(): void {
       patchState(store, { drawerOpen: false });
     },
