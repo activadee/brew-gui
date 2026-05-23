@@ -23,8 +23,8 @@ Minimalistic macOS Electron wrapper around Homebrew with Angular 21, Tailwind CS
 ## Development
 
 ```bash
-bun install
-bun run dev
+npm install
+npm run dev
 ```
 
 This starts:
@@ -36,16 +36,16 @@ This starts:
 ## Test
 
 ```bash
-bun run test        # Angular unit tests
-bun run test:node   # Electron/node tests (vitest)
-bun run test:all
+npm run test        # Angular unit tests
+npm run test:node   # Electron/node tests (vitest)
+npm run test:all
 ```
 
 ## Production Build
 
 ```bash
-bun run build
-bun run package:mac
+npm run build
+npm run package:mac
 ```
 
 Outputs are generated in `release/`.

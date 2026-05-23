@@ -10,7 +10,7 @@
 | Settings | [`settings-store.ts`](electron/services/settings-store.ts) + [`appSettingsSchema`](src/shared/contracts.ts) |
 | Security | Double Zod parse (preload + IPC); argv builders in [`homebrew-service.ts`](electron/services/homebrew-service.ts); **no runner allowlist** |
 | Release | [`auto-update.ts`](electron/services/auto-update.ts) stub (logs only); placeholder publish URL; **no CI** |
-| Tests | `bun run test:all` green; strong unit coverage on parsers/planners, weak IPC→UI integration/E2E |
+| Tests | `npm run test:all` green; strong unit coverage on parsers/planners, weak IPC→UI integration/E2E |
 
 ```mermaid
 flowchart TB
@@ -310,8 +310,8 @@ Apply to package/service names (taps already strict).
 Add [`.github/workflows/ci.yml`](.github/workflows/ci.yml):
 
 ```yaml
-# macos-latest: bun install --frozen-lockfile, bun run test:all, bun run build
-# optional: bun run package:dir on tag
+# macos-latest: npm ci, npm run test:all, npm run build
+# optional: npm run package:dir on tag
 ```
 
 ### 8b. Signing and notarization
@@ -418,6 +418,6 @@ flowchart LR
 ## Success criteria
 
 - Phase 3 roadmap items checked off (templates + history).
-- `bun run test:all` + CI green on macOS.
+- `npm run test:all` + CI green on macOS.
 - v0.5: signed DMG, job history survives restart, batch upgrade of 10+ packages works.
 - v1.0: auto-update, allowlist enforced, E2E covers tray + scheduler, README/CHANGELOG accurate.

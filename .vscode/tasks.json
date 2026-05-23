@@ -5,7 +5,7 @@
     {
       "label": "start",
       "type": "shell",
-      "command": "bun run start",
+      "command": "npm run start",
       "isBackground": true,
       "problemMatcher": {
         "owner": "typescript",
@@ -24,7 +24,7 @@
     {
       "label": "test",
       "type": "shell",
-      "command": "bun run test",
+      "command": "npm run test",
       "isBackground": true,
       "problemMatcher": {
         "owner": "typescript",

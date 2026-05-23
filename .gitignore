@@ -10,7 +10,8 @@
 
 # Node
 /node_modules
-package-lock.json
+bun.lock
+bunfig.toml
 npm-debug.log
 yarn-error.log
 
