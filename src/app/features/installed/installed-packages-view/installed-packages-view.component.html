@@ -48,16 +48,43 @@
       @if (installedStore.loading()) {
         <app-loading-state label="Loading installed formulae and casks…" />
       } @else if (installedStore.error()) {
-        <app-empty-state label="Load failed" [description]="installedStore.error() ?? ''" />
+        <app-diagnostic-panel
+          title="Load failed"
+          [message]="installedStore.error() ?? ''"
+          [copyText]="installedStore.error()"
+        />
       } @else if (installedStore.filteredItems().length === 0) {
         <app-empty-state
           label="No installed packages"
           description="No packages match the current search and filter."
         />
       } @else {
+        @if (selectionStore.count() > 0) {
+          <div class="flex flex-wrap items-center gap-2 rounded-lg border border-border/60 bg-muted/20 p-2">
+            <span class="text-sm">{{ selectionStore.count() }} selected</span>
+            <button type="button" z-button zSize="sm" [zDisabled]="actionBusy()" (click)="openBatchUninstall()">
+              Uninstall selected
+            </button>
+            <button
+              type="button"
+              z-button
+              zType="outline"
+              zSize="sm"
+              [zDisabled]="actionBusy() || batchPinDisabled()"
+              (click)="openBatchPin()"
+            >
+              Pin selected
+            </button>
+            <button type="button" z-button zType="outline" zSize="sm" (click)="selectionStore.clear()">Clear</button>
+          </div>
+        }
+
         <div class="stagger-list space-y-1.5">
           @for (item of installedStore.filteredItems(); track item.id) {
             <app-package-row
+              [selectable]="true"
+              [selected]="selectionStore.isSelected(item.id)"
+              (selectionChange)="selectionStore.toggle(item.id)"
               [name]="item.name"
               [kind]="item.kind"
               [desc]="item.desc"
@@ -87,6 +114,9 @@
       [commandPreview]="uninstallCommandPreview()"
       [kind]="selectedPackage()?.kind ?? null"
       [zapSelected]="zapSelected()"
+      [dependents]="dependents()"
+      [impactLoading]="impactLoading()"
+      [impactNote]="impactNote()"
       [busy]="uninstallBusy()"
       (cancel)="closeUninstallDialog()"
       (confirm)="confirmUninstall()"
@@ -105,4 +135,43 @@
       (confirm)="confirmReinstall()"
       (zapSelectedChange)="onReinstallZapSelectedChange($event)"
     />
+
+    <app-batch-confirm-dialog
+      [open]="batchConfirmOpen()"
+      [title]="batchDialogTitle()"
+      [message]="batchDialogMessage()"
+      [packageNames]="batchPackageNames()"
+      [commandPreview]="batchCommandPreview()"
+      [confirmLabel]="batchConfirmLabel()"
+      [busy]="batchBusy()"
+      (cancel)="closeBatchDialog()"
+      (confirm)="confirmBatch()"
+    />
+
+    @if (templatePickerOpen()) {
+      <div class="fixed inset-0 z-40 bg-black/35 backdrop-blur-sm" (click)="closeTemplatePicker()"></div>
+      <section class="fixed left-1/2 top-1/2 z-50 w-[480px] max-w-[92vw] -translate-x-1/2 -translate-y-1/2">
+        <z-card class="border-border/70 bg-popover/95 shadow-2xl">
+          <div class="space-y-3 p-1">
+            <h3 class="text-base font-semibold">Run template on {{ templateRunTarget()?.name }}</h3>
+            <select
+              class="w-full rounded-md border border-border bg-background px-2 py-1 text-sm"
+              [value]="selectedTemplateId() ?? ''"
+              (change)="selectedTemplateId.set($any($event.target).value)"
+            >
+              @for (template of templatesStore.templates(); track template.id) {
+                <option [value]="template.id">{{ template.name }} ({{ template.steps.length }} steps)</option>
+              }
+            </select>
+            @if (templatePreviewLines().length > 0) {
+              <pre class="max-h-32 overflow-auto rounded-md border border-border bg-muted/40 p-2 text-[11px] mono whitespace-pre-wrap">{{ templatePreviewLines().join('\n') }}</pre>
+            }
+            <div class="flex justify-end gap-2">
+              <button type="button" z-button zType="outline" zSize="sm" (click)="closeTemplatePicker()">Cancel</button>
+              <button type="button" z-button zSize="sm" [zDisabled]="batchBusy()" (click)="confirmRunTemplate()">Run</button>
+            </div>
+          </div>
+        </z-card>
+      </section>
+    }
   

@@ -2,9 +2,10 @@ import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { describe, expect, it, vi } from 'vitest';
 
-import type { BrewJobCompleteEvent, InstalledPackage } from '../../../../shared/contracts';
-import { BrewFacadeService } from '../../../core/services/brew-facade.service';
-import { ToastService } from '../../../core/services/toast.service';
+import type { InstalledPackage } from '../../../../shared/contracts';
+import { PackageActionsService } from '../../../core/services/package-actions.service';
+import { PackageSelectionStore } from '../../../core/stores/package-selection.store';
+import { TemplatesStore } from '../../../core/stores/templates.store';
 import { CatalogStore } from '../../../core/stores/catalog.store';
 import { InstalledStore } from '../../../core/stores/installed.store';
 import { PackageDetailsStore } from '../../../core/stores/package-details.store';
@@ -98,11 +99,17 @@ describe('InstalledPackagesViewComponent', () => {
     const updatesStore = { refresh: vi.fn(async () => undefined) };
     const catalogStore = { refresh: vi.fn(async () => undefined) };
     const packageDetailsStore = { openFor: vi.fn(async () => undefined) };
-    const facade = {
-      uninstallOne: vi.fn(async () => createJobCompleteEvent(uninstallSuccess)),
-      reinstallOne: vi.fn(async () => createJobCompleteEvent(reinstallSuccess))
+    const packageActions = {
+      uninstallOne: vi.fn(async () => uninstallSuccess),
+      reinstallOne: vi.fn(async () => reinstallSuccess),
+      getUninstallImpact: vi.fn(async () => ({ dependents: [], note: null })),
+      notifyPinSuccess: vi.fn(),
+      notifyUnpinSuccess: vi.fn(),
+      buildUninstallCommandPreview: vi.fn(() => 'brew uninstall'),
+      buildBatchCommandPreview: vi.fn(() => 'brew batch'),
+      buildTemplateCommandPreview: vi.fn(() => [])
     };
-    const toast = { push: vi.fn() };
+    const templatesStore = { templates: signal([]), load: vi.fn(async () => undefined) };
 
     await TestBed.configureTestingModule({
       imports: [InstalledPackagesViewComponent],
@@ -111,8 +118,9 @@ describe('InstalledPackagesViewComponent', () => {
         { provide: UpdatesStore, useValue: updatesStore },
         { provide: CatalogStore, useValue: catalogStore },
         { provide: PackageDetailsStore, useValue: packageDetailsStore },
-        { provide: BrewFacadeService, useValue: facade },
-        { provide: ToastService, useValue: toast }
+        { provide: PackageActionsService, useValue: packageActions },
+        { provide: TemplatesStore, useValue: templatesStore },
+        PackageSelectionStore
       ]
     }).compileComponents();
 
@@ -121,7 +129,7 @@ describe('InstalledPackagesViewComponent', () => {
     await fixture.whenStable();
     fixture.detectChanges();
 
-    return { fixture, installedStore, updatesStore, catalogStore, packageDetailsStore, facade, toast };
+    return { fixture, installedStore, updatesStore, catalogStore, packageDetailsStore, packageActions };
   }
 
   it('renders uninstall action for installed rows', async () => {
@@ -139,8 +147,10 @@ describe('InstalledPackagesViewComponent', () => {
 
     findButtonByText(html, 'Uninstall')?.click();
     fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
 
-    const zapToggle = html.querySelector('input[type="checkbox"]') as HTMLInputElement | null;
+    const zapToggle = dialogCheckbox(html);
     expect(zapToggle).toBeTruthy();
     expect(zapToggle?.checked).toBe(false);
   });
@@ -151,39 +161,43 @@ describe('InstalledPackagesViewComponent', () => {
 
     findButtonByText(html, 'Uninstall')?.click();
     fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
 
-    const zapToggle = html.querySelector('input[type="checkbox"]') as HTMLInputElement | null;
-    expect(zapToggle).toBeNull();
+    expect(dialogCheckbox(html)).toBeNull();
   });
 
   it('submits formula uninstall without zap', async () => {
-    const { fixture, facade, installedStore, updatesStore, catalogStore, toast } = await render([
+    const { fixture, packageActions, installedStore, updatesStore, catalogStore } = await render([
       formulaItem
     ]);
     const html = fixture.nativeElement as HTMLElement;
 
     findButtonByText(html, 'Uninstall')?.click();
     fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
 
     findButtonByText(html, 'Uninstall package')?.click();
     await fixture.whenStable();
     fixture.detectChanges();
 
-    expect(facade.uninstallOne).toHaveBeenCalledWith({ kind: 'formula', name: 'ripgrep' });
+    expect(packageActions.uninstallOne).toHaveBeenCalledWith({ kind: 'formula', name: 'ripgrep' });
     expect(installedStore.refresh).toHaveBeenCalled();
     expect(updatesStore.refresh).toHaveBeenCalled();
     expect(catalogStore.refresh).toHaveBeenCalled();
-    expect(toast.push).toHaveBeenCalledWith('Uninstalled ripgrep.', 'success');
   });
 
   it('submits cask uninstall with zap when selected', async () => {
-    const { fixture, facade } = await render([caskItem]);
+    const { fixture, packageActions } = await render([caskItem]);
     const html = fixture.nativeElement as HTMLElement;
 
     findButtonByText(html, 'Uninstall')?.click();
     fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
 
-    const zapToggle = html.querySelector('input[type="checkbox"]') as HTMLInputElement | null;
+    const zapToggle = dialogCheckbox(html);
     zapToggle?.click();
     fixture.detectChanges();
 
@@ -191,7 +205,7 @@ describe('InstalledPackagesViewComponent', () => {
     await fixture.whenStable();
     fixture.detectChanges();
 
-    expect(facade.uninstallOne).toHaveBeenCalledWith({
+    expect(packageActions.uninstallOne).toHaveBeenCalledWith({
       kind: 'cask',
       name: 'visual-studio-code',
       zap: true
@@ -199,7 +213,7 @@ describe('InstalledPackagesViewComponent', () => {
   });
 
   it('does not show success feedback when uninstall result is unsuccessful', async () => {
-    const { fixture, facade, installedStore, updatesStore, catalogStore, toast } = await render(
+    const { fixture, packageActions, installedStore, updatesStore, catalogStore } = await render(
       [formulaItem],
       { uninstallSuccess: false }
     );
@@ -207,16 +221,17 @@ describe('InstalledPackagesViewComponent', () => {
 
     findButtonByText(html, 'Uninstall')?.click();
     fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
 
     findButtonByText(html, 'Uninstall package')?.click();
     await fixture.whenStable();
     fixture.detectChanges();
 
-    expect(facade.uninstallOne).toHaveBeenCalledWith({ kind: 'formula', name: 'ripgrep' });
+    expect(packageActions.uninstallOne).toHaveBeenCalledWith({ kind: 'formula', name: 'ripgrep' });
     expect(installedStore.refresh).not.toHaveBeenCalled();
     expect(updatesStore.refresh).not.toHaveBeenCalled();
     expect(catalogStore.refresh).not.toHaveBeenCalled();
-    expect(toast.push).not.toHaveBeenCalled();
   });
 
   it('shows pin menu action for unpinned formula', async () => {
@@ -225,6 +240,7 @@ describe('InstalledPackagesViewComponent', () => {
 
     expect(component.overflowActionsFor(formulaItem)).toEqual([
       { id: 'view-details', label: 'View details' },
+      { id: 'run-template', label: 'Run template…', disabled: true },
       { id: 'reinstall', label: 'Reinstall package', disabled: false },
       { id: 'pin', label: 'Pin formula', disabled: false }
     ]);
@@ -236,6 +252,7 @@ describe('InstalledPackagesViewComponent', () => {
 
     expect(component.overflowActionsFor(pinnedFormulaItem)).toEqual([
       { id: 'view-details', label: 'View details' },
+      { id: 'run-template', label: 'Run template…', disabled: true },
       { id: 'reinstall', label: 'Reinstall package', disabled: false },
       { id: 'unpin', label: 'Unpin formula', disabled: false }
     ]);
@@ -247,6 +264,7 @@ describe('InstalledPackagesViewComponent', () => {
 
     expect(component.overflowActionsFor(caskItem)).toEqual([
       { id: 'view-details', label: 'View details' },
+      { id: 'run-template', label: 'Run template…', disabled: true },
       { id: 'reinstall', label: 'Reinstall package', disabled: false },
       { id: 'pin-not-supported', label: 'Pin not supported for casks', disabled: true }
     ]);
@@ -271,6 +289,7 @@ describe('InstalledPackagesViewComponent', () => {
     expect(component.overflowActionsFor(deprecatedItem)).toEqual([
       { id: 'view-details', label: 'View details' },
       { id: 'view-replacement-details', label: 'View replacement details (mise)' },
+      { id: 'run-template', label: 'Run template…', disabled: true },
       { id: 'reinstall', label: 'Reinstall package', disabled: false },
       { id: 'pin', label: 'Pin formula', disabled: false }
     ]);
@@ -289,7 +308,7 @@ describe('InstalledPackagesViewComponent', () => {
   });
 
   it('submits formula reinstall without zap', async () => {
-    const { fixture, facade, installedStore, updatesStore, catalogStore, toast } = await render([
+    const { fixture, packageActions, installedStore, updatesStore, catalogStore } = await render([
       formulaItem
     ]);
     const component = fixture.componentInstance as any;
@@ -302,22 +321,21 @@ describe('InstalledPackagesViewComponent', () => {
     await fixture.whenStable();
     fixture.detectChanges();
 
-    expect(facade.reinstallOne).toHaveBeenCalledWith({ kind: 'formula', name: 'ripgrep' });
+    expect(packageActions.reinstallOne).toHaveBeenCalledWith({ kind: 'formula', name: 'ripgrep' });
     expect(installedStore.refresh).toHaveBeenCalled();
     expect(updatesStore.refresh).toHaveBeenCalled();
     expect(catalogStore.refresh).toHaveBeenCalled();
-    expect(toast.push).toHaveBeenCalledWith('Reinstalled ripgrep.', 'success');
   });
 
   it('submits cask reinstall with zap when selected', async () => {
-    const { fixture, facade } = await render([caskItem]);
+    const { fixture, packageActions } = await render([caskItem]);
     const component = fixture.componentInstance as any;
 
     await component.onOverflowAction(caskItem, 'reinstall');
     fixture.detectChanges();
 
     const html = fixture.nativeElement as HTMLElement;
-    const zapToggle = html.querySelector('input[type="checkbox"]') as HTMLInputElement | null;
+    const zapToggle = dialogCheckbox(html);
     zapToggle?.click();
     fixture.detectChanges();
 
@@ -325,7 +343,7 @@ describe('InstalledPackagesViewComponent', () => {
     await fixture.whenStable();
     fixture.detectChanges();
 
-    expect(facade.reinstallOne).toHaveBeenCalledWith({
+    expect(packageActions.reinstallOne).toHaveBeenCalledWith({
       kind: 'cask',
       name: 'visual-studio-code',
       zap: true
@@ -333,7 +351,7 @@ describe('InstalledPackagesViewComponent', () => {
   });
 
   it('does not show success feedback when reinstall result is unsuccessful', async () => {
-    const { fixture, facade, installedStore, updatesStore, catalogStore, toast } = await render(
+    const { fixture, packageActions, installedStore, updatesStore, catalogStore } = await render(
       [formulaItem],
       { reinstallSuccess: false }
     );
@@ -347,24 +365,28 @@ describe('InstalledPackagesViewComponent', () => {
     await fixture.whenStable();
     fixture.detectChanges();
 
-    expect(facade.reinstallOne).toHaveBeenCalledWith({ kind: 'formula', name: 'ripgrep' });
+    expect(packageActions.reinstallOne).toHaveBeenCalledWith({ kind: 'formula', name: 'ripgrep' });
     expect(installedStore.refresh).not.toHaveBeenCalled();
     expect(updatesStore.refresh).not.toHaveBeenCalled();
     expect(catalogStore.refresh).not.toHaveBeenCalled();
-    expect(toast.push).not.toHaveBeenCalledWith('Reinstalled ripgrep.', 'success');
   });
 
   it('pins formula and refreshes updates on overflow action', async () => {
-    const { fixture, installedStore, updatesStore, toast } = await render([formulaItem]);
+    const { fixture, installedStore, updatesStore, packageActions } = await render([formulaItem]);
     const component = fixture.componentInstance as any;
 
     await component.onOverflowAction(formulaItem, 'pin');
 
     expect(installedStore.pinOne).toHaveBeenCalledWith({ kind: 'formula', name: 'ripgrep' });
     expect(updatesStore.refresh).toHaveBeenCalled();
-    expect(toast.push).toHaveBeenCalledWith('Pinned ripgrep.', 'success');
+    expect(packageActions.notifyPinSuccess).toHaveBeenCalledWith({ kind: 'formula', name: 'ripgrep' });
   });
 });
+
+function dialogCheckbox(root: HTMLElement): HTMLInputElement | null {
+  const dialog = root.querySelector('section.fixed');
+  return dialog?.querySelector('input[type="checkbox"]') as HTMLInputElement | null;
+}
 
 function findButtonByText(root: HTMLElement, text: string): HTMLButtonElement | null {
   const buttons = Array.from(root.querySelectorAll('button'));
@@ -373,17 +395,3 @@ function findButtonByText(root: HTMLElement, text: string): HTMLButtonElement | 
   );
 }
 
-function createJobCompleteEvent(success: boolean): BrewJobCompleteEvent {
-  return {
-    jobId: 'job-1',
-    action: 'uninstall',
-    command: 'brew uninstall --formula ripgrep',
-    kind: 'formula',
-    packageName: 'ripgrep',
-    success,
-    exitCode: success ? 0 : 1,
-    durationMs: 120,
-    output: success ? 'ok' : 'failed',
-    timestamp: '2026-02-25T00:00:00.000Z'
-  };
-}
