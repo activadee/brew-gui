@@ -42,7 +42,7 @@
               </p>
             </div>
             <div class="flex items-center gap-2">
-              <z-badge [zType]="record.status === 'succeeded' ? 'success' : 'destructive'">
+              <z-badge [zType]="record.status === 'succeeded' ? 'default' : 'destructive'">
                 {{ record.status }}
               </z-badge>
               <span class="text-xs text-muted-foreground">{{ record.durationMs }}ms</span>
