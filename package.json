@@ -1,7 +1,7 @@
 {
   "name": "brew-gui",
   "version": "0.5.1",
-  "description": "Minimalistic Homebrew sidebar desktop app",
+  "description": "Minimalistic Homebrew menu bar desktop app",
   "private": true,
   "packageManager": "npm@10.9.2",
   "main": "dist-electron/main.js",
@@ -79,8 +79,8 @@
     "wait-on": "^9.0.4"
   },
   "build": {
-    "appId": "com.brewsidebar.app",
-    "productName": "Brew Sidebar",
+    "appId": "com.brewdeck.app",
+    "productName": "Brewdeck",
     "asar": true,
     "directories": {
       "output": "release"

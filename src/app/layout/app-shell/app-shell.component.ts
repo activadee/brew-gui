@@ -119,7 +119,7 @@ export class AppShellComponent {
   protected readonly recoveryBannerDismissed = signal(false);
 
   protected readonly activeRouteLabel = computed(
-    () => ROUTE_LABELS[this.routePath()] ?? 'Brew Sidebar'
+    () => ROUTE_LABELS[this.routePath()] ?? 'Brewdeck'
   );
 
   protected readonly showRecoveryBanner = computed(
@@ -595,7 +595,7 @@ export class AppShellComponent {
       }),
       this.facade.onUpdateAvailable((event) => {
         this.toast.pushWithAction(
-          `Brew Sidebar ${event.version} is ready to install.`,
+          `Brewdeck ${event.version} is ready to install.`,
           'info',
           {
             label: 'Restart to update',
