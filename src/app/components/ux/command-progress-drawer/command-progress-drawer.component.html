@@ -90,7 +90,15 @@
                       <span>lines {{ job.outputLines.length }}</span>
                     </div>
 
-                    @if (job.error) {
+                    @if (job.status === 'failed') {
+                      <div class="mt-2">
+                        <app-diagnostic-panel
+                          title="Command failed"
+                          [message]="job.error ?? 'Homebrew command failed.'"
+                          [copyText]="stderrSnippet(job)"
+                        />
+                      </div>
+                    } @else if (job.error) {
                       <p class="mt-1.5 text-xs text-destructive">{{ job.error }}</p>
                     }
 

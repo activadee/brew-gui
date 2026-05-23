@@ -1,17 +1,14 @@
 
-    <section class="mx-auto max-w-xl">
+    <section class="mx-auto max-w-xl space-y-3">
+      <app-diagnostic-panel
+        title="Homebrew not detected"
+        message="Install Homebrew, then relaunch Brew Sidebar. This app runs as a local UI wrapper around the brew binary."
+        [copyText]="installCommand"
+      />
+
       <z-card class="space-y-3 border-border/70 bg-card/95 shadow-sm">
-        <z-badge zType="outline" zShape="pill">Homebrew Required</z-badge>
-
-        <div class="space-y-1.5">
-          <h2 class="text-xl font-semibold">Homebrew was not detected on this machine</h2>
-          <p class="text-sm text-muted-foreground">
-            Install Homebrew, then relaunch Brew Sidebar. This app runs as a local UI wrapper around the brew binary.
-          </p>
-        </div>
-
-        <pre class="overflow-x-auto rounded-md border border-border bg-muted/40 p-2 text-xs mono">/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"</pre>
-
+        <z-badge zType="outline" zShape="pill">Install command</z-badge>
+        <pre class="overflow-x-auto rounded-md border border-border bg-muted/40 p-2 text-xs mono">{{ installCommand }}</pre>
         <div class="flex items-center justify-between gap-3">
           <p class="text-xs text-muted-foreground">
             After install, run <span class="mono">brew --version</span> to verify.

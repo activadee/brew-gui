@@ -6,6 +6,7 @@ import { ZardCardComponent } from '@/shared/components/card';
 import { ZardDividerComponent } from '@/shared/components/divider';
 import { PackageFilterChipsComponent } from '../../shared/package-filter-chips/package-filter-chips.component';
 import { PackageSearchInputComponent } from '../../shared/package-search-input/package-search-input.component';
+import { DiagnosticPanelComponent } from '../diagnostic-panel/diagnostic-panel.component';
 import { JobsStore, type JobActionFilter, type JobKindFilter, type JobStatusFilter } from '../../../core/stores/jobs.store';
 
 @Component({
@@ -16,7 +17,8 @@ import { JobsStore, type JobActionFilter, type JobKindFilter, type JobStatusFilt
     ZardButtonComponent,
     ZardDividerComponent,
     PackageFilterChipsComponent,
-    PackageSearchInputComponent
+    PackageSearchInputComponent,
+    DiagnosticPanelComponent
   ],
   templateUrl: './command-progress-drawer.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -137,6 +139,16 @@ export class CommandProgressDrawerComponent {
     } catch {
       return value;
     }
+  }
+
+  protected stderrSnippet(job: { outputLines: { stream: string; text: string }[]; error: string | null }): string {
+    const stderrLines = job.outputLines
+      .filter((line) => line.stream === 'stderr')
+      .map((line) => line.text)
+      .join('\n')
+      .trim();
+
+    return stderrLines || job.error || 'No stderr output captured.';
   }
 
   protected formatDuration(durationMs: number | null): string {
