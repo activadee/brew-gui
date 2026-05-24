@@ -79,10 +79,13 @@ export class ZardSegmentedComponent implements ControlValueAccessor, OnInit {
     effect(() => {
       this.items.set(this.itemComponents());
     });
+
+    effect(() => {
+      this.selectedValue.set(this.zDefaultValue());
+    });
   }
 
   ngOnInit() {
-    // Initialize with default value
     if (this.zDefaultValue()) {
       this.selectedValue.set(this.zDefaultValue());
     }

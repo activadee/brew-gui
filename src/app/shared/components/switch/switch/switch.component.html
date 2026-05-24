@@ -6,6 +6,7 @@
         role="switch"
         [attr.data-state]="status()"
         [attr.aria-checked]="zChecked()"
+        [attr.aria-label]="zAriaLabel() ?? null"
         [class]="classes()"
         [disabled]="zDisabled() || formDisabled()"
         (click)="onSwitchChange()"
@@ -17,11 +18,13 @@
         ></span>
       </button>
 
-      <label
-        class="text-sm leading-none font-medium peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-        [for]="zId() || z.id()"
-      >
-        <ng-content><span class="sr-only">toggle switch</span></ng-content>
-      </label>
+      @if (!zAriaLabel()) {
+        <label
+          class="text-sm leading-none font-medium peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+          [for]="zId() || z.id()"
+        >
+          <ng-content><span class="sr-only">toggle switch</span></ng-content>
+        </label>
+      }
     </span>
   

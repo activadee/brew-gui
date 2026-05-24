@@ -44,6 +44,8 @@ export class ZardSwitchComponent implements ControlValueAccessor {
   readonly zSize = input<ZardSwitchSizeVariants>('default');
   readonly zType = input<ZardSwitchTypeVariants>('default');
   readonly zDisabled = input(false, { transform: booleanAttribute });
+  /** Accessible name when the visible label is omitted (e.g. settings row with external label). */
+  readonly zAriaLabel = input<string | undefined>(undefined);
 
   private onChange: OnChangeType = noopFn;
   private onTouched: OnTouchedType = noopFn;

@@ -1,168 +1,403 @@
+<section #pageRoot class="ui-shell-enter mx-auto max-w-3xl space-y-4 pb-8">
+  <header class="space-y-1">
+    <h2 class="text-lg font-semibold">Settings</h2>
+    <p class="text-sm text-muted-foreground">
+      Preferences for Brewdeck’s background agent, tray alerts, and Homebrew workflows. Changes save automatically.
+    </p>
+    @if (settingsStore.lastSavedAt(); as savedAt) {
+      <p class="text-xs text-muted-foreground" aria-live="polite">Saved {{ savedAt | date: 'shortTime' }}</p>
+    }
+  </header>
 
-    <section class="ui-shell-enter space-y-2">
-      <header class="flex items-center justify-between gap-2">
-        <div>
-          <h2 class="text-lg font-semibold">Settings</h2>
-          <p class="mt-1 text-sm text-muted-foreground">
-            Notification and refresh behavior for the Brewdeck background agent.
-          </p>
+  <app-settings-section-nav [sections]="sections" [pageRoot]="pageRoot" />
+
+  <div class="stagger-list space-y-4">
+    <!-- General -->
+    <z-card
+      id="settings-general"
+      class="fade-up scroll-mt-20 border-border/70 bg-card/95 shadow-sm"
+      aria-labelledby="settings-general-heading"
+    >
+      <div class="space-y-4">
+        <div class="flex items-center gap-2">
+          <z-icon zType="settings" zSize="sm" class="text-muted-foreground" />
+          <h3 id="settings-general-heading" class="text-sm font-semibold">General</h3>
         </div>
-        <z-badge zType="outline" zShape="pill">Preferences</z-badge>
-      </header>
 
-      <form [formGroup]="form" (ngSubmit)="save()">
-        <z-card class="space-y-3 border-border/70 bg-card/95 shadow-sm">
-          <div class="space-y-1.5">
-            <p class="text-sm font-medium">Check interval</p>
-            <z-segmented
-              zSize="sm"
-              [zOptions]="intervalOptions"
-              formControlName="checkIntervalMinutes"
-              zAriaLabel="Update check interval"
-            />
-          </div>
-
-          <z-divider zSpacing="sm" />
-
-          <div class="space-y-2">
-            <z-switch formControlName="autoCheckOnLaunch">Check for updates on launch</z-switch>
-            <z-switch formControlName="trayNotifyOnUpdates">Show tray badge when updates exist</z-switch>
-          </div>
-
-          <z-divider zSpacing="sm" />
-
-          <div class="space-y-2">
-            <p class="text-sm font-medium">Scheduled maintenance</p>
-            <div class="space-y-2 rounded-lg border border-border/60 bg-muted/20 p-3">
-              <div class="flex items-center justify-between gap-2">
-                <z-switch formControlName="scheduledMetadataSyncEnabled">Metadata sync</z-switch>
-                <z-badge zType="outline" zShape="pill">Daily</z-badge>
-              </div>
-              <div class="flex items-center justify-between gap-2">
-                <z-switch formControlName="scheduledCleanupEnabled">Cleanup</z-switch>
-                <z-badge zType="outline" zShape="pill">Weekly</z-badge>
-              </div>
-            </div>
-          </div>
-
-          <z-divider zSpacing="sm" />
-
-          <div class="space-y-2">
-            <z-switch formControlName="quietHoursEnabled">Mute scheduled tray alerts during quiet hours</z-switch>
-            @if (form.controls.quietHoursEnabled.value) {
-              <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                <label class="space-y-1 text-sm">
-                  <span class="text-muted-foreground">Start</span>
-                  <input z-input type="time" formControlName="quietHoursStart" />
-                </label>
-                <label class="space-y-1 text-sm">
-                  <span class="text-muted-foreground">End</span>
-                  <input z-input type="time" formControlName="quietHoursEnd" />
-                </label>
-              </div>
-            }
-            <p class="text-xs text-muted-foreground">Scheduled jobs still run; only tray alerts are muted.</p>
-          </div>
-
-          <z-divider zSpacing="sm" />
-
-          <div class="space-y-2">
-            <z-switch formControlName="showAdvancedInstallOptions">Show advanced install options (--force)</z-switch>
-            <z-switch formControlName="telemetryEnabled">Opt-in anonymous telemetry (local aggregates only)</z-switch>
-          </div>
-
-          <z-divider zSpacing="sm" />
-
-          <div class="space-y-3">
-            <div class="flex items-center justify-between gap-2">
-              <p class="text-sm font-medium">Action templates</p>
-              <button type="button" z-button zType="outline" zSize="sm" (click)="startNewTemplate()">New template</button>
-            </div>
-
-            <ul class="space-y-1 text-sm">
-              @for (template of templatesStore.templates(); track template.id) {
-                <li class="flex items-center justify-between gap-2 rounded border border-border/60 px-2 py-1">
-                  <span>{{ template.name }} ({{ template.steps.length }} steps)</span>
-                  <span class="flex gap-1">
-                    <button type="button" z-button zType="ghost" zSize="sm" (click)="editTemplate(template.id)">Edit</button>
-                    <button type="button" z-button zType="ghost" zSize="sm" (click)="deleteTemplate(template.id)">Delete</button>
-                  </span>
-                </li>
-              } @empty {
-                <li class="text-muted-foreground">No templates yet.</li>
-              }
-            </ul>
-
-            <div class="space-y-2 rounded-lg border border-border/60 bg-muted/20 p-3">
-              <label class="block space-y-1 text-sm">
-                <span class="text-muted-foreground">Template name</span>
-                <input z-input type="text" [value]="templateName()" (input)="templateName.set($any($event.target).value)" />
-              </label>
-
-              <div class="space-y-1">
-                @for (step of templateSteps(); track $index) {
-                  <div class="flex flex-wrap items-center gap-1">
-                    <select
-                      class="rounded-md border border-border bg-background px-2 py-1 text-sm"
-                      [value]="step.action"
-                      (change)="updateStepAction($index, $any($event.target).value)"
-                    >
-                      @for (option of stepOptions; track option) {
-                        <option [value]="option">{{ option }}</option>
-                      }
-                    </select>
-                    <button type="button" z-button zType="ghost" zSize="sm" [zDisabled]="$index === 0" (click)="moveStep($index, -1)">↑</button>
-                    <button
-                      type="button"
-                      z-button
-                      zType="ghost"
-                      zSize="sm"
-                      [zDisabled]="$index === templateSteps().length - 1"
-                      (click)="moveStep($index, 1)"
-                    >
-                      ↓
-                    </button>
-                    <button type="button" z-button zType="ghost" zSize="sm" (click)="removeStep($index)">Remove</button>
-                  </div>
-                }
-              </div>
-
-              <div class="flex gap-2">
-                <button type="button" z-button zType="outline" zSize="sm" (click)="addStep()">Add step</button>
-                <button type="button" z-button zSize="sm" (click)="saveTemplateDraft()">Save template</button>
-              </div>
-
-              @if (templateError()) {
-                <p class="text-xs text-destructive">{{ templateError() }}</p>
-              }
-            </div>
-          </div>
-
-          <z-divider zSpacing="sm" />
-
-          <div class="space-y-1.5">
+        <app-settings-setting-row>
+          <ng-container settingLabel>
             <p class="text-sm font-medium">Default view</p>
+            <p id="hint-default-view" class="text-xs text-muted-foreground">
+              Which screen opens when you launch Brewdeck.
+            </p>
+          </ng-container>
+          <ng-container settingControl>
             <z-segmented
               zSize="sm"
               [zOptions]="defaultViewOptions"
-              formControlName="defaultView"
+              [zDefaultValue]="settingsStore.settings().defaultView"
+              [zDisabled]="isSaving('defaultView')"
               zAriaLabel="Default startup view"
+              (zChange)="onDefaultViewChange($event)"
             />
+          </ng-container>
+        </app-settings-setting-row>
+
+        <app-settings-setting-row>
+          <ng-container settingLabel>
+            <p class="text-sm font-medium">Advanced install options</p>
+            <p id="hint-advanced-install" class="text-xs text-muted-foreground" aria-describedby="hint-advanced-install">
+              Show <span class="mono">--force</span> and related options in install flows.
+            </p>
+          </ng-container>
+          <ng-container settingControl>
+            <z-switch
+              zAriaLabel="Advanced install options"
+              [zChecked]="settingsStore.settings().showAdvancedInstallOptions"
+              [zDisabled]="isSaving('showAdvancedInstallOptions')"
+              [attr.aria-describedby]="'hint-advanced-install'"
+              (zCheckedChange)="updateSetting('showAdvancedInstallOptions', $event)"
+            />
+          </ng-container>
+        </app-settings-setting-row>
+
+        <z-divider zSpacing="sm" />
+
+        <div class="space-y-3">
+          <div class="flex items-center justify-between gap-2">
+            <div>
+              <p class="text-sm font-medium">Action templates</p>
+              <p class="text-xs text-muted-foreground">Reusable multi-step package workflows.</p>
+            </div>
+            <button type="button" z-button zType="outline" zSize="sm" (click)="startNewTemplate()">New template</button>
           </div>
 
-          <div class="flex items-center justify-end gap-2 pt-1">
-            <button type="button" z-button zType="outline" zSize="sm" [zDisabled]="settingsStore.saving()" (click)="resetForm()">
-              Reset
-            </button>
-            <button type="submit" z-button zSize="sm" [zDisabled]="settingsStore.saving()">
-              {{ settingsStore.saving() ? 'Saving…' : 'Save settings' }}
-            </button>
-          </div>
-        </z-card>
-      </form>
+          <ul class="space-y-1 text-sm">
+            @for (template of templatesStore.templates(); track template.id) {
+              <li class="flex items-center justify-between gap-2 rounded border border-border/60 px-2 py-1">
+                <span>{{ template.name }} ({{ template.steps.length }} steps)</span>
+                <span class="flex gap-1">
+                  <button type="button" z-button zType="ghost" zSize="sm" (click)="editTemplate(template.id)">
+                    Edit
+                  </button>
+                  <button type="button" z-button zType="ghost" zSize="sm" (click)="deleteTemplate(template.id)">
+                    Delete
+                  </button>
+                </span>
+              </li>
+            } @empty {
+              <li class="text-muted-foreground">No templates yet.</li>
+            }
+          </ul>
 
-      @if (settingsStore.error()) {
-        <p class="text-sm text-destructive">{{ settingsStore.error() }}</p>
-      }
-    </section>
-  
+          <div class="space-y-2 rounded-lg border border-border/60 bg-muted/20 p-3">
+            <label class="block space-y-1 text-sm">
+              <span class="text-muted-foreground">Template name</span>
+              <input z-input type="text" [value]="templateName()" (input)="onTemplateNameInput($event)" />
+            </label>
+
+            <div class="space-y-1">
+              @for (step of templateSteps(); track $index) {
+                <div class="flex flex-wrap items-center gap-1">
+                  <select
+                    class="rounded-md border border-border bg-background px-2 py-1 text-sm"
+                    [value]="step.action"
+                    (change)="onStepActionChange($index, $event)"
+                  >
+                    @for (option of stepOptions; track option) {
+                      <option [value]="option">{{ option }}</option>
+                    }
+                  </select>
+                  <button type="button" z-button zType="ghost" zSize="sm" [zDisabled]="$index === 0" (click)="moveStep($index, -1)">
+                    ↑
+                  </button>
+                  <button
+                    type="button"
+                    z-button
+                    zType="ghost"
+                    zSize="sm"
+                    [zDisabled]="$index === templateSteps().length - 1"
+                    (click)="moveStep($index, 1)"
+                  >
+                    ↓
+                  </button>
+                  <button type="button" z-button zType="ghost" zSize="sm" (click)="removeStep($index)">Remove</button>
+                </div>
+              }
+            </div>
+
+            <div class="flex gap-2">
+              <button type="button" z-button zType="outline" zSize="sm" (click)="addStep()">Add step</button>
+              <button type="button" z-button zSize="sm" (click)="saveTemplateDraft()">Save template</button>
+            </div>
+
+            @if (templateError()) {
+              <p class="text-xs text-destructive">{{ templateError() }}</p>
+            }
+          </div>
+        </div>
+      </div>
+    </z-card>
+
+    <!-- Brew & CLI -->
+    <z-card
+      id="settings-brew"
+      class="fade-up scroll-mt-20 border-border/70 bg-card/95 shadow-sm"
+      aria-labelledby="settings-brew-heading"
+    >
+      <div class="space-y-4">
+        <div class="flex items-center gap-2">
+          <z-icon zType="terminal" zSize="sm" class="text-muted-foreground" />
+          <h3 id="settings-brew-heading" class="text-sm font-semibold">Brew &amp; CLI</h3>
+        </div>
+
+        <p class="text-xs text-muted-foreground">
+          Scheduled Homebrew maintenance runs in the background. Tray alerts for these jobs follow your notification
+          settings.
+        </p>
+
+        <app-settings-setting-row>
+          <ng-container settingLabel>
+            <p class="text-sm font-medium">Metadata sync</p>
+            <p id="hint-metadata-sync" class="text-xs text-muted-foreground">Daily catalog metadata refresh.</p>
+          </ng-container>
+          <ng-container settingControl>
+            <z-switch
+              zAriaLabel="Metadata sync"
+              [zChecked]="settingsStore.settings().scheduledMetadataSyncEnabled"
+              [zDisabled]="isSaving('scheduledMetadataSyncEnabled')"
+              [attr.aria-describedby]="'hint-metadata-sync'"
+              (zCheckedChange)="updateSetting('scheduledMetadataSyncEnabled', $event)"
+            />
+          </ng-container>
+        </app-settings-setting-row>
+
+        <app-settings-setting-row>
+          <ng-container settingLabel>
+            <p class="text-sm font-medium">Cleanup</p>
+            <p id="hint-cleanup" class="text-xs text-muted-foreground">Weekly <span class="mono">brew cleanup</span> dry-run and reclaim.</p>
+          </ng-container>
+          <ng-container settingControl>
+            <z-switch
+              zAriaLabel="Cleanup"
+              [zChecked]="settingsStore.settings().scheduledCleanupEnabled"
+              [zDisabled]="isSaving('scheduledCleanupEnabled')"
+              [attr.aria-describedby]="'hint-cleanup'"
+              (zCheckedChange)="updateSetting('scheduledCleanupEnabled', $event)"
+            />
+          </ng-container>
+        </app-settings-setting-row>
+      </div>
+    </z-card>
+
+    <!-- Notifications -->
+    <z-card
+      id="settings-notifications"
+      class="fade-up scroll-mt-20 border-border/70 bg-card/95 shadow-sm"
+      aria-labelledby="settings-notifications-heading"
+    >
+      <div class="space-y-4">
+        <div class="flex items-center gap-2">
+          <z-icon zType="bell" zSize="sm" class="text-muted-foreground" />
+          <h3 id="settings-notifications-heading" class="text-sm font-semibold">Notifications</h3>
+        </div>
+
+        <app-settings-setting-row>
+          <ng-container settingLabel>
+            <p class="text-sm font-medium">Tray badge on updates</p>
+            <p id="hint-tray-badge" class="text-xs text-muted-foreground">
+              Show a menu bar indicator when outdated packages are found.
+            </p>
+          </ng-container>
+          <ng-container settingControl>
+            <z-switch
+              zAriaLabel="Tray badge on updates"
+              [zChecked]="settingsStore.settings().trayNotifyOnUpdates"
+              [zDisabled]="isSaving('trayNotifyOnUpdates')"
+              [attr.aria-describedby]="'hint-tray-badge'"
+              (zCheckedChange)="updateSetting('trayNotifyOnUpdates', $event)"
+            />
+          </ng-container>
+        </app-settings-setting-row>
+
+        <z-divider zSpacing="sm" />
+
+        <app-settings-setting-row>
+          <ng-container settingLabel>
+            <p class="text-sm font-medium">Quiet hours</p>
+            <p id="hint-quiet-hours" class="text-xs text-muted-foreground">
+              Mute scheduled tray alerts during this window. Jobs still run.
+            </p>
+          </ng-container>
+          <ng-container settingControl>
+            <z-switch
+              zAriaLabel="Quiet hours"
+              [zChecked]="settingsStore.settings().quietHoursEnabled"
+              [zDisabled]="isSaving('quietHoursEnabled')"
+              [attr.aria-describedby]="'hint-quiet-hours'"
+              (zCheckedChange)="updateSetting('quietHoursEnabled', $event)"
+            />
+          </ng-container>
+        </app-settings-setting-row>
+
+        @if (settingsStore.settings().quietHoursEnabled) {
+          <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <label class="space-y-1 text-sm">
+              <span class="text-muted-foreground">Start</span>
+              <input
+                z-input
+                type="time"
+                [value]="settingsStore.settings().quietHoursStart"
+                [attr.aria-describedby]="'hint-quiet-hours'"
+                (blur)="onQuietHoursStartBlur($event)"
+              />
+            </label>
+            <label class="space-y-1 text-sm">
+              <span class="text-muted-foreground">End</span>
+              <input
+                z-input
+                type="time"
+                [value]="settingsStore.settings().quietHoursEnd"
+                [attr.aria-describedby]="'hint-quiet-hours'"
+                (blur)="onQuietHoursEndBlur($event)"
+              />
+            </label>
+          </div>
+        }
+      </div>
+    </z-card>
+
+    <!-- Updates -->
+    <z-card
+      id="settings-updates"
+      class="fade-up scroll-mt-20 border-border/70 bg-card/95 shadow-sm"
+      aria-labelledby="settings-updates-heading"
+    >
+      <div class="space-y-4">
+        <div class="flex items-center gap-2">
+          <z-icon zType="activity" zSize="sm" class="text-muted-foreground" />
+          <h3 id="settings-updates-heading" class="text-sm font-semibold">Updates</h3>
+        </div>
+
+        <app-settings-setting-row>
+          <ng-container settingLabel>
+            <p class="text-sm font-medium">Check interval</p>
+            <p id="hint-check-interval" class="text-xs text-muted-foreground">
+              How often Brewdeck checks for outdated packages.
+            </p>
+          </ng-container>
+          <ng-container settingControl>
+            <z-segmented
+              zSize="sm"
+              [zOptions]="intervalOptions"
+              [zDefaultValue]="'' + settingsStore.settings().checkIntervalMinutes"
+              [zDisabled]="isSaving('checkIntervalMinutes')"
+              zAriaLabel="Update check interval"
+              (zChange)="onCheckIntervalChange($event)"
+            />
+          </ng-container>
+        </app-settings-setting-row>
+
+        <app-settings-setting-row>
+          <ng-container settingLabel>
+            <p class="text-sm font-medium">Check on launch</p>
+            <p id="hint-check-launch" class="text-xs text-muted-foreground">Run an update check when Brewdeck starts.</p>
+          </ng-container>
+          <ng-container settingControl>
+            <z-switch
+              zAriaLabel="Check on launch"
+              [zChecked]="settingsStore.settings().autoCheckOnLaunch"
+              [zDisabled]="isSaving('autoCheckOnLaunch')"
+              [attr.aria-describedby]="'hint-check-launch'"
+              (zCheckedChange)="updateSetting('autoCheckOnLaunch', $event)"
+            />
+          </ng-container>
+        </app-settings-setting-row>
+      </div>
+    </z-card>
+
+    <!-- Privacy -->
+    <z-card
+      id="settings-privacy"
+      class="fade-up scroll-mt-20 border-border/70 bg-card/95 shadow-sm"
+      aria-labelledby="settings-privacy-heading"
+    >
+      <app-settings-setting-row>
+        <ng-container settingLabel>
+          <div class="space-y-1">
+            <div class="flex items-center gap-2">
+              <z-icon zType="shield" zSize="sm" class="text-muted-foreground" />
+              <h3 id="settings-privacy-heading" class="text-sm font-semibold">Privacy</h3>
+            </div>
+            <p id="hint-telemetry" class="text-xs text-muted-foreground">
+              Opt in to anonymous telemetry. Only local aggregates are collected.
+            </p>
+          </div>
+        </ng-container>
+        <ng-container settingControl>
+          <z-switch
+            zAriaLabel="Anonymous telemetry"
+            [zChecked]="settingsStore.settings().telemetryEnabled"
+            [zDisabled]="isSaving('telemetryEnabled')"
+            [attr.aria-describedby]="'hint-telemetry'"
+            (zCheckedChange)="updateSetting('telemetryEnabled', $event)"
+          />
+        </ng-container>
+      </app-settings-setting-row>
+    </z-card>
+
+    <!-- Danger zone -->
+    <z-card
+      id="settings-danger"
+      class="fade-up scroll-mt-20 border-destructive/30 bg-card/95 shadow-sm"
+      aria-labelledby="settings-danger-heading"
+    >
+      <div class="space-y-4">
+        <div class="flex items-center gap-2">
+          <z-icon zType="triangle-alert" zSize="sm" class="text-destructive" />
+          <h3 id="settings-danger-heading" class="text-sm font-semibold text-destructive">Danger zone</h3>
+        </div>
+        <p class="text-xs text-muted-foreground">
+          Destructive actions require confirmation and do not auto-save.
+        </p>
+
+        <app-settings-setting-row>
+          <ng-container settingLabel>
+            <p class="text-sm font-medium">Reset all settings</p>
+            <p class="text-xs text-muted-foreground">Restore every preference to its default value.</p>
+          </ng-container>
+          <ng-container settingControl>
+            <button type="button" z-button zType="destructive" zSize="sm" (click)="confirmResetSettings()">
+              Reset settings
+            </button>
+          </ng-container>
+        </app-settings-setting-row>
+
+        <z-divider zSpacing="sm" />
+
+        <app-settings-setting-row>
+          <ng-container settingLabel>
+            <p class="text-sm font-medium">Clear action templates</p>
+            <p class="text-xs text-muted-foreground">Delete all saved templates from local storage.</p>
+          </ng-container>
+          <ng-container settingControl>
+            <button
+              type="button"
+              z-button
+              zType="outline"
+              zSize="sm"
+              [zDisabled]="templatesStore.templates().length === 0"
+              (click)="confirmClearTemplates()"
+            >
+              Clear templates
+            </button>
+          </ng-container>
+        </app-settings-setting-row>
+      </div>
+    </z-card>
+  </div>
+
+  @if (settingsStore.error()) {
+    <p class="text-sm text-destructive" role="alert">{{ settingsStore.error() }}</p>
+  }
+</section>
