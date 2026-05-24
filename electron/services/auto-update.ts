@@ -1,7 +1,7 @@
 import { app } from 'electron';
 import { autoUpdater } from 'electron-updater';
 
-import type { AppUpdateState } from '../../src/shared/contracts';
+import type { AppReleaseChannel, AppUpdateState } from '../../src/shared/contracts';
 import { log } from '../utils/logger';
 
 declare const __ENABLE_AUTO_UPDATES__: boolean;
@@ -15,6 +15,8 @@ interface ConfigureAutoUpdateOptions {
 let currentState: AppUpdateState = createInitialState();
 let stateEmitter: UpdateStateEmitter | null = null;
 let configured = false;
+let appliedReleaseChannel: AppReleaseChannel = 'stable';
+let hasAppliedChannel = false;
 
 function createInitialState(): AppUpdateState {
   return {
@@ -40,6 +42,31 @@ export function getUpdateState(): AppUpdateState {
   return currentState;
 }
 
+export function applyAppReleaseChannel(channel: AppReleaseChannel): void {
+  if (!isAutoUpdateEnabled()) {
+    return;
+  }
+
+  if (hasAppliedChannel && appliedReleaseChannel === channel) {
+    return;
+  }
+
+  const channelChanged = hasAppliedChannel && appliedReleaseChannel !== channel;
+  appliedReleaseChannel = channel;
+  hasAppliedChannel = true;
+  autoUpdater.allowPrerelease = channel === 'nightly';
+
+  if (channelChanged && configured) {
+    setState({
+      status: 'checking',
+      availableVersion: undefined,
+      releaseNotes: undefined,
+      error: undefined
+    });
+    void checkForAppUpdate();
+  }
+}
+
 export async function checkForAppUpdate(): Promise<void> {
   if (!isAutoUpdateEnabled()) {
     return;
@@ -47,6 +74,10 @@ export async function checkForAppUpdate(): Promise<void> {
 
   setState({ status: 'checking', error: undefined });
   await autoUpdater.checkForUpdates();
+}
+
+export function startAutoUpdatePolling(): void {
+  void checkForAppUpdate();
 }
 
 export async function quitAndInstallUpdate(): Promise<void> {
@@ -114,6 +145,4 @@ export function configureAutoUpdate(options: ConfigureAutoUpdateOptions = {}): v
       error: undefined
     });
   });
-
-  void checkForAppUpdate();
 }

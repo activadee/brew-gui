@@ -21,8 +21,8 @@
       </z-sidebar-group>
 
       <div class="brew-sidebar-footer flex items-center justify-between gap-2 px-1">
-        @if (versionLabel()) {
-          <span class="text-[11px] text-muted-foreground">{{ versionLabel() }}</span>
+        @if (appUpdateStore.sidebarVersionLabel()) {
+          <span class="text-[11px] text-muted-foreground">{{ appUpdateStore.sidebarVersionLabel() }}</span>
         }
         @if (appUpdateStore.canRestart()) {
           <button type="button" z-button zSize="sm" (click)="appUpdateStore.quitAndInstall()">Update</button>

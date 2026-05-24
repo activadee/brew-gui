@@ -60,7 +60,9 @@ Publishing uses the app token when configured; otherwise `GITHUB_TOKEN` is used 
 
 ## Auto-update
 
-Shipped apps only auto-update from **stable** releases (`vX.Y.Z` without `-beta`).
+By default, shipped apps auto-update from **stable** releases (`vX.Y.Z` without `-beta`).
+
+Users can switch to **nightly** in Settings → General → App release channel. That opts into prerelease builds (CI **beta** channel: `vX.Y.Z-beta.N`, about every 6 hours when `main` changes).
 
 ## Local development
 

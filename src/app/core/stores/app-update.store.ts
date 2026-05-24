@@ -3,6 +3,7 @@ import { patchState, signalStore, withComputed, withMethods, withState } from '@
 
 import type { AppUpdateState } from '../../../shared/contracts';
 import { BrewFacadeService } from '../services/brew-facade.service';
+import { SettingsStore } from './settings.store';
 
 interface AppUpdateStoreState {
   state: AppUpdateState | null;
@@ -17,7 +18,7 @@ const initialState: AppUpdateStoreState = {
 export const AppUpdateStore = signalStore(
   { providedIn: 'root' },
   withState(initialState),
-  withComputed((store) => ({
+  withComputed((store, settingsStore = inject(SettingsStore)) => ({
     currentVersion: computed(() => store.state()?.currentVersion ?? ''),
     checking: computed(() => store.state()?.status === 'checking'),
     isDownloading: computed(() => store.state()?.status === 'downloading'),
@@ -27,6 +28,14 @@ export const AppUpdateStore = signalStore(
     sidebarFooterLabel: computed(() =>
       store.state()?.status === 'downloading' ? 'Downloading…' : ''
     ),
+    sidebarVersionLabel: computed(() => {
+      const version = store.state()?.currentVersion ?? '';
+      const channel = settingsStore.settings().appReleaseChannel;
+      if (!version) {
+        return '';
+      }
+      return `v${version} · ${channel}`;
+    }),
     hintText: computed(() => {
       const updateState = store.state();
       if (!updateState) {

@@ -9,7 +9,11 @@ import { ZardIconComponent } from '@/shared/components/icon';
 import { ZardInputDirective } from '@/shared/components/input';
 import { ZardSegmentedComponent, type SegmentedOption } from '@/shared/components/segmented';
 import { ZardSwitchComponent } from '@/shared/components/switch';
-import type { ActionTemplateStep, AppSettings } from '../../../../shared/contracts';
+import {
+  appReleaseChannelSchema,
+  type ActionTemplateStep,
+  type AppSettings
+} from '../../../../shared/contracts';
 import { ToastService } from '../../../core/services/toast.service';
 import { PackageActionsService } from '../../../core/services/package-actions.service';
 import { TemplatesStore } from '../../../core/stores/templates.store';
@@ -74,6 +78,11 @@ export class SettingsViewComponent {
     { value: 'browse', label: 'Browse' }
   ];
 
+  protected readonly appReleaseChannelOptions: SegmentedOption[] = [
+    { value: 'stable', label: 'Stable' },
+    { value: 'nightly', label: 'Nightly' }
+  ];
+
   constructor() {
     void this.templatesStore.load();
 
@@ -110,6 +119,13 @@ export class SettingsViewComponent {
   protected onDefaultViewChange(value: string): void {
     if (value === 'updates' || value === 'installed' || value === 'browse') {
       this.updateSetting('defaultView', value);
+    }
+  }
+
+  protected onAppReleaseChannelChange(value: string): void {
+    const parsed = appReleaseChannelSchema.safeParse(value);
+    if (parsed.success) {
+      this.updateSetting('appReleaseChannel', parsed.data);
     }
   }
 

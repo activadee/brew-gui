@@ -229,6 +229,9 @@ export const templatesRunRequestSchema = z.object({
 });
 export type TemplatesRunRequest = z.infer<typeof templatesRunRequestSchema>;
 
+export const appReleaseChannelSchema = z.enum(['stable', 'nightly']);
+export type AppReleaseChannel = z.infer<typeof appReleaseChannelSchema>;
+
 export const appSettingsSchema = z.object({
   checkIntervalMinutes: z.union([z.literal(60), z.literal(360), z.literal(1440)]),
   autoCheckOnLaunch: z.boolean(),
@@ -242,7 +245,8 @@ export const appSettingsSchema = z.object({
   defaultView: z.union([z.literal('updates'), z.literal('installed'), z.literal('browse')]),
   showAdvancedInstallOptions: z.boolean().default(false),
   telemetryEnabled: z.boolean().default(false),
-  actionTemplates: z.array(actionTemplateSchema).max(20).default([])
+  actionTemplates: z.array(actionTemplateSchema).max(20).default([]),
+  appReleaseChannel: appReleaseChannelSchema.default('stable')
 });
 export type AppSettings = z.infer<typeof appSettingsSchema>;
 
@@ -782,7 +786,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   defaultView: 'updates',
   showAdvancedInstallOptions: false,
   telemetryEnabled: false,
-  actionTemplates: []
+  actionTemplates: [],
+  appReleaseChannel: 'stable'
 };
 
 export const DEFAULT_WINDOW_CHROME_STATE: WindowChromeState = {

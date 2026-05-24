@@ -10,6 +10,7 @@ describe('SidebarNavComponent', () => {
   function configure(updateStore: Record<string, unknown> = {}) {
     const appUpdateStore = {
       currentVersion: signal('0.5.2'),
+      sidebarVersionLabel: signal('v0.5.2 · stable'),
       canRestart: signal(false),
       sidebarFooterLabel: signal(''),
       state: signal<{ status: string } | null>({ status: 'upToDate' }),
@@ -54,7 +55,7 @@ describe('SidebarNavComponent', () => {
     expect(html.textContent).toContain('Doctor');
   });
 
-  it('shows version in the sidebar footer', async () => {
+  it('shows version and release channel in the sidebar footer', async () => {
     await configure().compileComponents();
 
     const fixture = TestBed.createComponent(SidebarNavComponent);
@@ -62,6 +63,20 @@ describe('SidebarNavComponent', () => {
 
     const footer = (fixture.nativeElement as HTMLElement).querySelector('.brew-sidebar-footer');
     expect(footer?.textContent).toContain('v0.5.2');
+    expect(footer?.textContent).toContain('stable');
+  });
+
+  it('shows nightly when nightly channel is selected', async () => {
+    await configure({
+      sidebarVersionLabel: signal('v0.5.2 · nightly')
+    }).compileComponents();
+
+    const fixture = TestBed.createComponent(SidebarNavComponent);
+    fixture.detectChanges();
+
+    const footer = (fixture.nativeElement as HTMLElement).querySelector('.brew-sidebar-footer');
+    expect(footer?.textContent).toContain('v0.5.2');
+    expect(footer?.textContent).toContain('nightly');
   });
 
   it('shows Update button when an app update is ready', async () => {

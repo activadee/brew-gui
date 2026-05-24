@@ -45,6 +45,25 @@
 
         <app-settings-setting-row>
           <ng-container settingLabel>
+            <p class="text-sm font-medium">App release channel</p>
+            <p id="hint-app-release-channel" class="text-xs text-muted-foreground">
+              Stable follows tagged releases. Nightly follows prerelease builds from main (about every 6 hours).
+            </p>
+          </ng-container>
+          <ng-container settingControl>
+            <z-segmented
+              zSize="sm"
+              [zOptions]="appReleaseChannelOptions"
+              [zDefaultValue]="settingsStore.settings().appReleaseChannel"
+              [zDisabled]="isSaving('appReleaseChannel')"
+              zAriaLabel="App release channel"
+              (zChange)="onAppReleaseChannelChange($event)"
+            />
+          </ng-container>
+        </app-settings-setting-row>
+
+        <app-settings-setting-row>
+          <ng-container settingLabel>
             <p class="text-sm font-medium">Advanced install options</p>
             <p id="hint-advanced-install" class="text-xs text-muted-foreground" aria-describedby="hint-advanced-install">
               Show <span class="mono">--force</span> and related options in install flows.

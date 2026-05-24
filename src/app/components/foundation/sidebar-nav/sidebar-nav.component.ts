@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, input } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 
 import { ZardBadgeComponent } from '@/shared/components/badge';
@@ -27,11 +27,6 @@ export class SidebarNavComponent {
   readonly updateCount = input(0);
 
   protected readonly appUpdateStore = inject(AppUpdateStore);
-
-  protected readonly versionLabel = computed(() => {
-    const version = this.appUpdateStore.currentVersion();
-    return version ? `v${version}` : '';
-  });
 
   protected readonly navItems = [
     { label: 'Updates', route: '/updates' },
