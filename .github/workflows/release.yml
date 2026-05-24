@@ -1,16 +1,251 @@
 name: Release
 
+concurrency:
+  group: release-${{ github.event.inputs.ref_tag || github.ref_name }}
+  cancel-in-progress: false
+
 on:
   push:
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      ref_tag:
+        description: 'Release tag to build (e.g. v0.5.3-beta.1). Used when tag push does not trigger workflows.'
+        required: false
+        type: string
 
 permissions:
   contents: write
 
 jobs:
-  build-macos-dmg:
+  preflight:
+    name: Preflight
+    if: startsWith(github.ref, 'refs/tags/') || inputs.ref_tag != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.release_meta.outputs.version }}
+      tag: ${{ steps.release_meta.outputs.tag }}
+      release_name: ${{ steps.release_meta.outputs.name }}
+      release_channel: ${{ steps.release_meta.outputs.release_channel }}
+      is_prerelease: ${{ steps.release_meta.outputs.is_prerelease }}
+      make_latest: ${{ steps.release_meta.outputs.make_latest }}
+      previous_tag: ${{ steps.previous_tag.outputs.previous_tag }}
+      ref: ${{ steps.resolve_ref.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - id: resolve_ref
+        name: Resolve release ref
+        shell: bash
+        run: |
+          if [[ -n "${{ inputs.ref_tag }}" ]]; then
+            tag="${{ inputs.ref_tag }}"
+            sha="$(git rev-list -n 1 "$tag")"
+          else
+            tag="${GITHUB_REF_NAME}"
+            sha="${GITHUB_SHA}"
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+
+      - id: release_meta
+        name: Resolve release metadata
+        shell: bash
+        run: |
+          raw="${{ steps.resolve_ref.outputs.tag }}"
+          version="${raw#v}"
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
+            echo "Invalid release version: $raw" >&2
+            exit 1
+          fi
+
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=$raw" >> "$GITHUB_OUTPUT"
+          echo "name=Brewdeck v$version" >> "$GITHUB_OUTPUT"
+
+          if [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "release_channel=stable" >> "$GITHUB_OUTPUT"
+            echo "is_prerelease=false" >> "$GITHUB_OUTPUT"
+            echo "make_latest=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "release_channel=beta" >> "$GITHUB_OUTPUT"
+            echo "is_prerelease=true" >> "$GITHUB_OUTPUT"
+            echo "make_latest=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - id: previous_tag
+        name: Resolve previous release tag
+        run: |
+          npx tsx scripts/resolve-previous-release-tag.ts \
+            --channel "${{ steps.release_meta.outputs.release_channel }}" \
+            --current-tag "${{ steps.release_meta.outputs.tag }}" \
+            --github-output
+
+  build:
+    name: Build macOS
+    needs: preflight
+    if: startsWith(github.ref, 'refs/tags/') || inputs.ref_tag != ''
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.preflight.outputs.ref }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Align package version
+        run: npx tsx scripts/update-release-package-version.ts "${{ needs.preflight.outputs.version }}"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Test
+        run: npm run test:all
+
+      - name: Build macOS artifacts (unsigned)
+        run: npm run package:mac
+        env:
+          ENABLE_AUTO_UPDATES: '1'
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: brewdeck-macos-${{ needs.preflight.outputs.tag }}
+          path: |
+            release/*.dmg
+            release/*.zip
+            release/*.yml
+          retention-days: 14
+
+  publish:
+    name: Publish GitHub Release
+    needs: [preflight, build]
+    if: startsWith(github.ref, 'refs/tags/') || inputs.ref_tag != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Download release artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: brewdeck-macos-${{ needs.preflight.outputs.tag }}
+          path: release-assets
+
+      - name: Publish release
+        if: needs.preflight.outputs.previous_tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.preflight.outputs.tag }}
+          target_commitish: ${{ needs.preflight.outputs.ref }}
+          name: ${{ needs.preflight.outputs.release_name }}
+          generate_release_notes: true
+          previous_tag: ${{ needs.preflight.outputs.previous_tag }}
+          prerelease: ${{ needs.preflight.outputs.is_prerelease == 'true' }}
+          make_latest: ${{ needs.preflight.outputs.make_latest == 'true' }}
+          files: |
+            release-assets/*.dmg
+            release-assets/*.zip
+            release-assets/*.yml
+          fail_on_unmatched_files: true
+
+      - name: Publish first release
+        if: needs.preflight.outputs.previous_tag == ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.preflight.outputs.tag }}
+          target_commitish: ${{ needs.preflight.outputs.ref }}
+          name: ${{ needs.preflight.outputs.release_name }}
+          generate_release_notes: true
+          prerelease: ${{ needs.preflight.outputs.is_prerelease == 'true' }}
+          make_latest: ${{ needs.preflight.outputs.make_latest == 'true' }}
+          files: |
+            release-assets/*.dmg
+            release-assets/*.zip
+            release-assets/*.yml
+          fail_on_unmatched_files: true
+
+  finalize:
+    name: Finalize version on branch
+    needs: [preflight, publish]
+    if: |
+      (startsWith(github.ref, 'refs/tags/') || inputs.ref_tag != '') &&
+      needs.preflight.result == 'success' &&
+      needs.publish.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.preflight.outputs.ref }}
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Update package version
+        id: update_versions
+        env:
+          RELEASE_VERSION: ${{ needs.preflight.outputs.version }}
+        run: npx tsx scripts/update-release-package-version.ts "$RELEASE_VERSION" --github-output
+
+      - name: Commit and push to development
+        if: |
+          steps.update_versions.outputs.changed == 'true' &&
+          needs.preflight.outputs.is_prerelease == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json
+          git commit -m "chore(release): prepare ${{ needs.preflight.outputs.tag }}"
+          git push origin HEAD:development
+
+      - name: Commit and push to main
+        if: |
+          steps.update_versions.outputs.changed == 'true' &&
+          needs.preflight.outputs.is_prerelease == 'false'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json
+          git commit -m "chore(release): prepare ${{ needs.preflight.outputs.tag }}"
+          git push origin HEAD:main
+
+      - name: Sync development for next pre-release line
+        if: needs.preflight.outputs.is_prerelease == 'false'
+        run: |
+          git fetch origin development main
+          git checkout development
+          NEXT_BASE=$(node -e "
+            const v = '${{ needs.preflight.outputs.version }}'.replace(/[-+].*$/, '').split('.').map(Number);
+            console.log([v[0], v[1], v[2] + 1].join('.'));
+          ")
+          npx tsx scripts/update-release-package-version.ts "$NEXT_BASE"
+          if git diff --quiet -- package.json; then
+            echo "development already aligned."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json
+          git commit -m "chore(release): prepare next development line after ${{ needs.preflight.outputs.tag }}"
+          git push origin HEAD:development
+
+  manual-build:
+    name: Manual unsigned build
+    if: github.event_name == 'workflow_dispatch'
     runs-on: macos-latest
     timeout-minutes: 45
     steps:
@@ -27,23 +262,13 @@ jobs:
       - name: Test
         run: npm run test:all
 
-      - name: Build and publish macOS release (unsigned)
-        if: startsWith(github.ref, 'refs/tags/')
-        run: npm run package:mac:publish
-        env:
-          ENABLE_AUTO_UPDATES: '1'
-          CSC_IDENTITY_AUTO_DISCOVERY: false
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Build macOS artifacts (unsigned, no publish)
-        if: "!startsWith(github.ref, 'refs/tags/')"
         run: npm run package:mac
         env:
           ENABLE_AUTO_UPDATES: '1'
           CSC_IDENTITY_AUTO_DISCOVERY: false
 
       - name: Upload build artifacts
-        if: github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
           name: brewdeck-macos-${{ github.run_number }}

@@ -54,14 +54,14 @@ Outputs are generated in `release/`.
 
 ## GitHub Release (unsigned)
 
-Pushing a version tag builds unsigned macOS artifacts on GitHub Actions and publishes them to a GitHub Release (DMG for manual install, ZIP + `latest-mac.yml` for in-app auto-update):
+Releases are automated from branch merges — see [CONTRIBUTING.md](CONTRIBUTING.md) for the full git flow.
 
-```bash
-git tag v0.5.0
-git push origin v0.5.0
-```
+| Merge | Release |
+|-------|---------|
+| Squash PR → `development` | Pre-release `vX.Y.Z-beta.N` (unsigned DMG + ZIP + `latest-mac.yml`) |
+| Rebase PR → `main` | Stable `vX.Y.Z` marked **Latest** |
 
-You can also run the **Release** workflow manually from the Actions tab (`workflow_dispatch`); artifacts are uploaded to the workflow run only (no GitHub Release unless you push a tag).
+Do not push version tags manually. You can run the **Release** workflow manually from the Actions tab (`workflow_dispatch`) to build unsigned artifacts for a workflow run only (no GitHub Release).
 
 The CI job sets `CSC_IDENTITY_AUTO_DISCOVERY=false`, so builds are **unsigned**. macOS Gatekeeper may block first launch (and sometimes updated installs) until the user uses **Right-click → Open** or allows the app in **System Settings → Privacy & Security**.
 

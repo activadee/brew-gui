@@ -1,0 +1,90 @@
+name: Bump and Tag
+
+on:
+  push:
+    branches:
+      - development
+      - main
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  prerelease:
+    name: Tag pre-release
+    if: |
+      github.ref == 'refs/heads/development' &&
+      !startsWith(github.event.head_commit.message, 'chore(release):')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Resolve next pre-release tag
+        id: meta
+        run: npx tsx scripts/resolve-prerelease.ts --github-output
+
+      - name: Create and push tag
+        env:
+          TAG: ${{ steps.meta.outputs.tag }}
+        run: |
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG already exists."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag "$TAG" "${{ github.sha }}"
+          git push origin "$TAG"
+
+      - name: Trigger release workflow
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.meta.outputs.tag }}
+        run: gh workflow run release.yml --ref "$TAG" -f "ref_tag=$TAG"
+
+  stable:
+    name: Tag stable release
+    if: |
+      github.ref == 'refs/heads/main' &&
+      !startsWith(github.event.head_commit.message, 'chore(release):')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Resolve stable release tag
+        id: meta
+        run: npx tsx scripts/resolve-stable-release.ts --github-output
+
+      - name: Create and push tag
+        env:
+          TAG: ${{ steps.meta.outputs.tag }}
+        run: |
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG already exists."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag "$TAG" "${{ github.sha }}"
+          git push origin "$TAG"
+
+      - name: Trigger release workflow
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.meta.outputs.tag }}
+        run: gh workflow run release.yml --ref "$TAG" -f "ref_tag=$TAG"
