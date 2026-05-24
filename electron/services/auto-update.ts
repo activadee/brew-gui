@@ -1,45 +1,119 @@
 import { app } from 'electron';
 import { autoUpdater } from 'electron-updater';
 
-import type { AppUpdateAvailableEvent } from '../../src/shared/contracts';
+import type { AppUpdateState } from '../../src/shared/contracts';
 import { log } from '../utils/logger';
 
-export function configureAutoUpdate(onUpdateAvailable?: (event: AppUpdateAvailableEvent) => void): void {
-  if (!app.isPackaged || process.env.ENABLE_AUTO_UPDATES !== '1') {
-    log.info('Auto-updater is disabled (set ENABLE_AUTO_UPDATES=1 in packaged builds to enable).');
+declare const __ENABLE_AUTO_UPDATES__: boolean;
+
+type UpdateStateEmitter = (state: AppUpdateState) => void;
+
+interface ConfigureAutoUpdateOptions {
+  onStateChanged?: UpdateStateEmitter;
+}
+
+let currentState: AppUpdateState = createInitialState();
+let stateEmitter: UpdateStateEmitter | null = null;
+let configured = false;
+
+function createInitialState(): AppUpdateState {
+  return {
+    status: isAutoUpdateEnabled() ? 'upToDate' : 'disabled',
+    currentVersion: app.getVersion()
+  };
+}
+
+function setState(patch: Partial<AppUpdateState> & Pick<AppUpdateState, 'status'>): void {
+  currentState = {
+    ...currentState,
+    ...patch,
+    currentVersion: app.getVersion()
+  };
+  stateEmitter?.(currentState);
+}
+
+export function isAutoUpdateEnabled(): boolean {
+  return app.isPackaged && __ENABLE_AUTO_UPDATES__;
+}
+
+export function getUpdateState(): AppUpdateState {
+  return currentState;
+}
+
+export async function checkForAppUpdate(): Promise<void> {
+  if (!isAutoUpdateEnabled()) {
     return;
   }
+
+  setState({ status: 'checking', error: undefined });
+  await autoUpdater.checkForUpdates();
+}
+
+export async function quitAndInstallUpdate(): Promise<void> {
+  if (!isAutoUpdateEnabled() || currentState.status !== 'ready') {
+    return;
+  }
+
+  autoUpdater.quitAndInstall();
+}
+
+export function configureAutoUpdate(options: ConfigureAutoUpdateOptions = {}): void {
+  stateEmitter = options.onStateChanged ?? null;
+  currentState = createInitialState();
+  stateEmitter?.(currentState);
+
+  if (!isAutoUpdateEnabled()) {
+    log.info(
+      'Auto-updater is disabled (unpackaged dev builds, or ENABLE_AUTO_UPDATES=0 at build time).'
+    );
+    return;
+  }
+
+  if (configured) {
+    return;
+  }
+  configured = true;
 
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
 
   autoUpdater.on('error', (error) => {
     log.warn('Auto-updater error', error, { correlationId: 'auto-update' });
+    setState({
+      status: 'error',
+      error: error instanceof Error ? error.message : String(error)
+    });
   });
 
   autoUpdater.on('update-available', (info) => {
     log.info('Update available', { version: info.version, correlationId: 'auto-update' });
+    setState({
+      status: 'downloading',
+      availableVersion: info.version,
+      releaseNotes: typeof info.releaseNotes === 'string' ? info.releaseNotes : null,
+      error: undefined
+    });
   });
 
   autoUpdater.on('update-not-available', () => {
     log.info('No update available', { correlationId: 'auto-update' });
+    setState({
+      status: 'upToDate',
+      availableVersion: undefined,
+      releaseNotes: undefined,
+      error: undefined
+    });
   });
 
   autoUpdater.on('update-downloaded', (info) => {
     log.info('Update downloaded; restart to apply', { version: info.version, correlationId: 'auto-update' });
-    onUpdateAvailable?.({
-      version: info.version,
-      releaseNotes: typeof info.releaseNotes === 'string' ? info.releaseNotes : null
+    setState({
+      status: 'ready',
+      availableVersion: info.version,
+      releaseNotes: typeof info.releaseNotes === 'string' ? info.releaseNotes : null,
+      error: undefined
     });
   });
 
-  void autoUpdater.checkForUpdates();
-}
-
-export async function quitAndInstallUpdate(): Promise<void> {
-  if (!app.isPackaged || process.env.ENABLE_AUTO_UPDATES !== '1') {
-    return;
-  }
-
-  autoUpdater.quitAndInstall();
+  void checkForAppUpdate();
 }

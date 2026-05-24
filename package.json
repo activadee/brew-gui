@@ -19,8 +19,8 @@
     "test": "ng test --watch=false",
     "test:node": "vitest run",
     "test:all": "npm run test && npm run test:node",
-    "package:mac": "npm run build && electron-builder --mac",
-    "package:mac:publish": "npm run build && electron-builder --mac --publish always",
+    "package:mac": "ENABLE_AUTO_UPDATES=1 npm run build && electron-builder --mac",
+    "package:mac:publish": "ENABLE_AUTO_UPDATES=1 npm run build && electron-builder --mac --publish always",
     "package:dir": "npm run build && electron-builder --dir"
   },
   "prettier": {
@@ -59,7 +59,8 @@
     "tailwindcss": "^4.2.1",
     "tailwindcss-animate": "^1.0.7",
     "tslib": "^2.3.0",
-    "zod": "^4.3.6"
+    "zod": "^4.3.6",
+    "electron-updater": "^6.8.3"
   },
   "devDependencies": {
     "@angular/build": "^21.1.5",
@@ -70,7 +71,6 @@
     "concurrently": "^9.2.1",
     "electron": "^40.6.1",
     "electron-builder": "^26.8.1",
-    "electron-updater": "^6.8.3",
     "jsdom": "^27.1.0",
     "tsup": "^8.5.1",
     "tsx": "^4.21.0",

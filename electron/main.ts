@@ -477,8 +477,10 @@ async function bootstrap(): Promise<void> {
   trayAlertController.updateSettings(settings);
 
   registerHandlers();
-  configureAutoUpdate((event) => {
-    emitRendererEvent(IPC_CHANNELS.EVENTS_UPDATE_AVAILABLE, event);
+  configureAutoUpdate({
+    onStateChanged: (state) => {
+      emitRendererEvent(IPC_CHANNELS.EVENTS_UPDATE_STATE_CHANGED, state);
+    }
   });
   backgroundScheduler.start(settings);
   emitWindowChromeChanged();

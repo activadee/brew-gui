@@ -130,8 +130,12 @@ describe('AppShellComponent titlebar', () => {
         onJobFailedHandler = handler;
         return () => undefined;
       }),
-      onUpdateAvailable: vi.fn(() => () => undefined),
-      quitAndInstallUpdate: vi.fn(async () => undefined)
+      quitAndInstallUpdate: vi.fn(async () => undefined),
+      getUpdateState: vi.fn(async () => ({
+        status: 'disabled' as const,
+        currentVersion: '0.0.0'
+      })),
+      onUpdateStateChanged: vi.fn(() => () => undefined)
     };
 
     const toast = {
@@ -143,7 +147,8 @@ describe('AppShellComponent titlebar', () => {
         }>
       >([]),
       dismiss: vi.fn(),
-      push: vi.fn()
+      push: vi.fn(),
+      pushWithAction: vi.fn()
     };
 
     await TestBed.configureTestingModule({

@@ -2,6 +2,8 @@ export const IPC_CHANNELS = {
   APP_OPEN_MAIN: 'app:openMain',
   APP_WINDOW_CONTROL: 'app:windowControl',
   APP_GET_WINDOW_CHROME: 'app:getWindowChrome',
+  APP_GET_UPDATE_STATE: 'app:getUpdateState',
+  APP_CHECK_FOR_APP_UPDATE: 'app:checkForAppUpdate',
   APP_QUIT_AND_INSTALL_UPDATE: 'app:quitAndInstallUpdate',
   GET_BREW_AVAILABILITY: 'brew:getAvailability',
   GET_INSTALLED: 'brew:getInstalled',
@@ -47,5 +49,5 @@ export const IPC_CHANNELS = {
   EVENTS_JOB_PROGRESS: 'brew:job-progress',
   EVENTS_JOB_COMPLETE: 'brew:job-complete',
   EVENTS_JOB_FAILED: 'brew:job-failed',
-  EVENTS_UPDATE_AVAILABLE: 'app:updateAvailable'
+  EVENTS_UPDATE_STATE_CHANGED: 'app:updateStateChanged'
 } as const;

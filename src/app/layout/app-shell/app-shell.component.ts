@@ -4,6 +4,7 @@ import {
   DestroyRef,
   HostListener,
   computed,
+  effect,
   inject,
   signal
 } from '@angular/core';
@@ -36,6 +37,7 @@ import { BrewFacadeService } from '../../core/services/brew-facade.service';
 import { PackageActionsService } from '../../core/services/package-actions.service';
 import { ToastService } from '../../core/services/toast.service';
 import { AppStatusStore } from '../../core/stores/app-status.store';
+import { AppUpdateStore } from '../../core/stores/app-update.store';
 import { CatalogStore } from '../../core/stores/catalog.store';
 import { InstalledStore } from '../../core/stores/installed.store';
 import { JobsStore } from '../../core/stores/jobs.store';
@@ -93,6 +95,7 @@ type PendingPackageAction =
 })
 export class AppShellComponent {
   protected readonly appStatusStore = inject(AppStatusStore);
+  private readonly appUpdateStore = inject(AppUpdateStore);
   protected readonly catalogStore = inject(CatalogStore);
   protected readonly installedStore = inject(InstalledStore);
   protected readonly jobsStore = inject(JobsStore);
@@ -107,6 +110,8 @@ export class AppShellComponent {
   private readonly packageActions = inject(PackageActionsService);
   private readonly router = inject(Router);
   private readonly toast = inject(ToastService);
+
+  private lastAppUpdateStatus: string | null = null;
 
   protected readonly paletteOpen = signal(false);
   protected readonly paletteMode = signal<CommandPaletteMode>('root');
@@ -204,6 +209,7 @@ export class AppShellComponent {
     void this.refreshWindowChromeState();
     this.registerRouterTracking();
     this.registerEventBridges();
+    this.registerAppUpdateReadyToast();
   }
 
   @HostListener('window:keydown', ['$event'])
@@ -512,7 +518,7 @@ export class AppShellComponent {
   private async initialize(): Promise<void> {
     try {
       await this.settingsStore.load();
-      await this.appStatusStore.initialize();
+      await Promise.all([this.appStatusStore.initialize(), this.appUpdateStore.initialize()]);
       void this.templatesStore.load();
 
       // Informational only: recovery does not re-run brew commands.
@@ -572,22 +578,39 @@ export class AppShellComponent {
         if (event.action !== 'syncMetadata') {
           this.toast.push(`Homebrew command failed: ${event.error}`, 'error', 6_000);
         }
-      }),
-      this.facade.onUpdateAvailable((event) => {
-        this.toast.pushWithAction(
-          `Brewdeck ${event.version} is ready to install.`,
-          'info',
-          {
-            label: 'Restart to update',
-            run: () => this.facade.quitAndInstallUpdate()
-          },
-          30_000
-        );
       })
     ];
 
     this.destroyRef.onDestroy(() => {
       unsubscribers.forEach((unsubscribe) => unsubscribe());
+    });
+  }
+
+  private registerAppUpdateReadyToast(): void {
+    effect(() => {
+      const updateState = this.appUpdateStore.state();
+      if (!updateState) {
+        return;
+      }
+
+      const status = updateState.status;
+      const previous = this.lastAppUpdateStatus;
+      this.lastAppUpdateStatus = status;
+
+      if (status !== 'ready' || previous !== 'downloading') {
+        return;
+      }
+
+      const version = updateState.availableVersion ?? updateState.currentVersion;
+      this.toast.pushWithAction(
+        `Brewdeck ${version} is ready to install.`,
+        'info',
+        {
+          label: 'Restart to update',
+          run: () => this.facade.quitAndInstallUpdate()
+        },
+        30_000
+      );
     });
   }
 

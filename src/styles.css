@@ -365,6 +365,12 @@
     height: 100%;
   }
 
+  .brew-sidebar-surface > aside > .flex-1 > .brew-sidebar-footer {
+    flex-shrink: 0;
+    margin-top: auto;
+    padding-top: 8px;
+  }
+
   .brew-nav-stack {
     display: flex;
     min-height: 100%;

@@ -4,7 +4,7 @@ import {
   actionTemplateSchema,
   appSettingsSchema,
   appSettingsUpdateSchema,
-  appUpdateAvailableEventSchema,
+  appUpdateStateSchema,
   batchJobResultSchema,
   batchManyRequestSchema,
   historyListRequestSchema,
@@ -64,6 +64,15 @@ const api: BrewGuiBridge = {
   async getWindowChromeState() {
     const payload = await ipcRenderer.invoke(IPC_CHANNELS.APP_GET_WINDOW_CHROME);
     return windowChromeStateSchema.parse(payload);
+  },
+
+  async getUpdateState() {
+    const payload = await ipcRenderer.invoke(IPC_CHANNELS.APP_GET_UPDATE_STATE);
+    return appUpdateStateSchema.parse(payload);
+  },
+
+  async checkForAppUpdate() {
+    await ipcRenderer.invoke(IPC_CHANNELS.APP_CHECK_FOR_APP_UPDATE);
   },
 
   async quitAndInstallUpdate() {
@@ -332,13 +341,13 @@ const api: BrewGuiBridge = {
     return () => ipcRenderer.removeListener(IPC_CHANNELS.EVENTS_JOB_FAILED, listener);
   },
 
-  onUpdateAvailable(handler) {
+  onUpdateStateChanged(handler) {
     const listener = (_event: unknown, payload: unknown) => {
-      handler(appUpdateAvailableEventSchema.parse(payload));
+      handler(appUpdateStateSchema.parse(payload));
     };
 
-    ipcRenderer.on(IPC_CHANNELS.EVENTS_UPDATE_AVAILABLE, listener);
-    return () => ipcRenderer.removeListener(IPC_CHANNELS.EVENTS_UPDATE_AVAILABLE, listener);
+    ipcRenderer.on(IPC_CHANNELS.EVENTS_UPDATE_STATE_CHANGED, listener);
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.EVENTS_UPDATE_STATE_CHANGED, listener);
   }
 };
 

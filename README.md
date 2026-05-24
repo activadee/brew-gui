@@ -67,11 +67,11 @@ The CI job sets `CSC_IDENTITY_AUTO_DISCOVERY=false`, so builds are **unsigned**.
 
 ### In-app auto-update (unsigned)
 
-Release CI sets `ENABLE_AUTO_UPDATES=1` when packaging. Packaged apps with that flag check [GitHub Releases](https://github.com/activadee/brew-gui/releases) via `electron-updater` (GitHub provider in `package.json`). When a newer tag is published, the app downloads the ZIP in the background and shows **Restart to update** in a toast.
+Packaged builds enable in-app updates by default (`ENABLE_AUTO_UPDATES` is on unless set to `0` at build time). They check [GitHub Releases](https://github.com/activadee/brew-gui/releases) via `electron-updater` (GitHub provider in `package.json`). When a newer tag is published, the app downloads the ZIP in the background and shows **Restart to update** in a toast.
 
 Limitations without code signing / notarization:
 
-- Updates still rely on tagged releases (`v*`); local `package:mac` builds do not publish metadata.
+- Updates still rely on tagged releases (`v*`); local `package:mac` builds do not publish release metadata to GitHub.
 - macOS may quarantine downloaded updates the same way as a fresh DMG install.
 - Auto-update uses the **ZIP** artifact, not the DMG.
 

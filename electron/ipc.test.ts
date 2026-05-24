@@ -14,6 +14,9 @@ describe('IPC channel allowlist', () => {
     expect(channels).toContain('brew:searchCatalog');
     expect(channels).toContain('app:windowControl');
     expect(channels).toContain('app:getWindowChrome');
+    expect(channels).toContain('app:getUpdateState');
+    expect(channels).toContain('app:checkForAppUpdate');
+    expect(channels).toContain('app:updateStateChanged');
     expect(channels).toContain('brew:installOne');
     expect(channels).toContain('brew:reinstallOne');
     expect(channels).toContain('brew:uninstallOne');
