@@ -13,7 +13,7 @@ import {
 import type { CheckNowResult, WindowChromeState, WindowControlAction } from '../src/shared/contracts';
 import { IPC_CHANNELS } from './ipc-channels';
 import { registerIpcHandlers } from './ipc';
-import { configureAutoUpdate } from './services/auto-update';
+import { applyAppReleaseChannel, configureAutoUpdate } from './services/auto-update';
 import { BackgroundScheduler, type UpdateCheckTrigger } from './services/background-scheduler';
 import { ActionTemplateRunner } from './services/action-template-runner';
 import { ActionTemplatesStore } from './services/action-templates-store';
@@ -444,6 +444,7 @@ function registerHandlers(): void {
     onSettingsChanged: (settings) => {
       backgroundScheduler.onSettingsChanged(settings);
       trayAlertController.updateSettings(settings);
+      applyAppReleaseChannel(settings.appReleaseChannel);
     },
     runManualUpdateCheck: async (): Promise<CheckNowResult> => {
       return backgroundScheduler.runManualUpdateCheck();
@@ -480,7 +481,8 @@ async function bootstrap(): Promise<void> {
   configureAutoUpdate({
     onStateChanged: (state) => {
       emitRendererEvent(IPC_CHANNELS.EVENTS_UPDATE_STATE_CHANGED, state);
-    }
+    },
+    releaseChannel: settings.appReleaseChannel
   });
   backgroundScheduler.start(settings);
   emitWindowChromeChanged();

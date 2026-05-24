@@ -74,6 +74,11 @@ export class SettingsViewComponent {
     { value: 'browse', label: 'Browse' }
   ];
 
+  protected readonly appReleaseChannelOptions: SegmentedOption[] = [
+    { value: 'stable', label: 'Stable' },
+    { value: 'nightly', label: 'Nightly' }
+  ];
+
   constructor() {
     void this.templatesStore.load();
 
@@ -110,6 +115,12 @@ export class SettingsViewComponent {
   protected onDefaultViewChange(value: string): void {
     if (value === 'updates' || value === 'installed' || value === 'browse') {
       this.updateSetting('defaultView', value);
+    }
+  }
+
+  protected onAppReleaseChannelChange(value: string): void {
+    if (value === 'stable' || value === 'nightly') {
+      this.updateSetting('appReleaseChannel', value);
     }
   }
 

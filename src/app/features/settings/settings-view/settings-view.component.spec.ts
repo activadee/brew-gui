@@ -153,6 +153,22 @@ describe('SettingsViewComponent', () => {
     );
   });
 
+  it('updates app release channel when segmented control changes', async () => {
+    const { fixture, updateSetting } = await render({
+      ...DEFAULT_SETTINGS,
+      appReleaseChannel: 'stable'
+    });
+    const html = fixture.nativeElement as HTMLElement;
+
+    const nightlyOption = [...html.querySelectorAll('#settings-general button')].find((button) =>
+      button.textContent?.includes('Nightly')
+    ) as HTMLButtonElement | undefined;
+    nightlyOption?.click();
+    fixture.detectChanges();
+
+    expect(updateSetting).toHaveBeenCalledWith('appReleaseChannel', 'nightly');
+  });
+
   it('updates default view when segmented control changes', async () => {
     const { fixture, updateSetting } = await render({
       ...DEFAULT_SETTINGS,

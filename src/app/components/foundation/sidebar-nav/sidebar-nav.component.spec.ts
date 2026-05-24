@@ -3,11 +3,16 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { describe, expect, it } from 'vitest';
 
+import { DEFAULT_SETTINGS } from '../../../../shared/contracts';
 import { AppUpdateStore } from '../../../core/stores/app-update.store';
+import { SettingsStore } from '../../../core/stores/settings.store';
 import { SidebarNavComponent } from './sidebar-nav.component';
 
 describe('SidebarNavComponent', () => {
-  function configure(updateStore: Record<string, unknown> = {}) {
+  function configure(
+    updateStore: Record<string, unknown> = {},
+    appReleaseChannel: 'stable' | 'nightly' = 'stable'
+  ) {
     const appUpdateStore = {
       currentVersion: signal('0.5.2'),
       canRestart: signal(false),
@@ -17,11 +22,16 @@ describe('SidebarNavComponent', () => {
       ...updateStore
     };
 
+    const settingsStore = {
+      settings: signal({ ...DEFAULT_SETTINGS, appReleaseChannel })
+    };
+
     return TestBed.configureTestingModule({
       imports: [SidebarNavComponent],
       providers: [
         provideRouter([]),
-        { provide: AppUpdateStore, useValue: appUpdateStore }
+        { provide: AppUpdateStore, useValue: appUpdateStore },
+        { provide: SettingsStore, useValue: settingsStore }
       ]
     });
   }
@@ -54,14 +64,24 @@ describe('SidebarNavComponent', () => {
     expect(html.textContent).toContain('Doctor');
   });
 
-  it('shows version in the sidebar footer', async () => {
-    await configure().compileComponents();
+  it('shows release channel in the sidebar footer', async () => {
+    await configure({}, 'stable').compileComponents();
 
     const fixture = TestBed.createComponent(SidebarNavComponent);
     fixture.detectChanges();
 
     const footer = (fixture.nativeElement as HTMLElement).querySelector('.brew-sidebar-footer');
-    expect(footer?.textContent).toContain('v0.5.2');
+    expect(footer?.textContent).toContain('stable');
+  });
+
+  it('shows nightly when nightly channel is selected', async () => {
+    await configure({}, 'nightly').compileComponents();
+
+    const fixture = TestBed.createComponent(SidebarNavComponent);
+    fixture.detectChanges();
+
+    const footer = (fixture.nativeElement as HTMLElement).querySelector('.brew-sidebar-footer');
+    expect(footer?.textContent).toContain('nightly');
   });
 
   it('shows Update button when an app update is ready', async () => {

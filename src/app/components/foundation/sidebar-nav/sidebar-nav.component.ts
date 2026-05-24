@@ -8,6 +8,7 @@ import {
   SidebarGroupComponent
 } from '@/shared/components/layout';
 import { AppUpdateStore } from '../../../core/stores/app-update.store';
+import { SettingsStore } from '../../../core/stores/settings.store';
 
 @Component({
   selector: 'app-sidebar-nav',
@@ -27,11 +28,9 @@ export class SidebarNavComponent {
   readonly updateCount = input(0);
 
   protected readonly appUpdateStore = inject(AppUpdateStore);
+  private readonly settingsStore = inject(SettingsStore);
 
-  protected readonly versionLabel = computed(() => {
-    const version = this.appUpdateStore.currentVersion();
-    return version ? `v${version}` : '';
-  });
+  protected readonly versionLabel = computed(() => this.settingsStore.settings().appReleaseChannel);
 
   protected readonly navItems = [
     { label: 'Updates', route: '/updates' },

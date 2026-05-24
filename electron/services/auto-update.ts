@@ -1,7 +1,7 @@
 import { app } from 'electron';
 import { autoUpdater } from 'electron-updater';
 
-import type { AppUpdateState } from '../../src/shared/contracts';
+import type { AppReleaseChannel, AppUpdateState } from '../../src/shared/contracts';
 import { log } from '../utils/logger';
 
 declare const __ENABLE_AUTO_UPDATES__: boolean;
@@ -10,11 +10,13 @@ type UpdateStateEmitter = (state: AppUpdateState) => void;
 
 interface ConfigureAutoUpdateOptions {
   onStateChanged?: UpdateStateEmitter;
+  releaseChannel?: AppReleaseChannel;
 }
 
 let currentState: AppUpdateState = createInitialState();
 let stateEmitter: UpdateStateEmitter | null = null;
 let configured = false;
+let appliedReleaseChannel: AppReleaseChannel | null = null;
 
 function createInitialState(): AppUpdateState {
   return {
@@ -38,6 +40,21 @@ export function isAutoUpdateEnabled(): boolean {
 
 export function getUpdateState(): AppUpdateState {
   return currentState;
+}
+
+export function applyAppReleaseChannel(channel: AppReleaseChannel): void {
+  if (!isAutoUpdateEnabled()) {
+    return;
+  }
+
+  const allowPrerelease = channel === 'nightly';
+  const previousChannel = appliedReleaseChannel;
+  appliedReleaseChannel = channel;
+  autoUpdater.allowPrerelease = allowPrerelease;
+
+  if (previousChannel !== null && previousChannel !== channel && configured) {
+    void checkForAppUpdate();
+  }
 }
 
 export async function checkForAppUpdate(): Promise<void> {
@@ -76,6 +93,8 @@ export function configureAutoUpdate(options: ConfigureAutoUpdateOptions = {}): v
 
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
+
+  applyAppReleaseChannel(options.releaseChannel ?? 'stable');
 
   autoUpdater.on('error', (error) => {
     log.warn('Auto-updater error', error, { correlationId: 'auto-update' });

@@ -5,6 +5,7 @@ const updaterListeners = new Map<string, (payload?: unknown) => void>();
 const autoUpdater = {
   autoDownload: false,
   autoInstallOnAppQuit: false,
+  allowPrerelease: false,
   on: vi.fn((event: string, handler: (payload?: unknown) => void) => {
     updaterListeners.set(event, handler);
   }),
@@ -103,6 +104,31 @@ describe('auto-update service', () => {
     configureAutoUpdate();
 
     expect(autoUpdater.on).toHaveBeenCalledTimes(4);
+  });
+
+  it('sets allowPrerelease from release channel on configure', async () => {
+    const { configureAutoUpdate, applyAppReleaseChannel } = await loadModule();
+
+    configureAutoUpdate({ releaseChannel: 'stable' });
+    expect(autoUpdater.allowPrerelease).toBe(false);
+
+    applyAppReleaseChannel('nightly');
+    expect(autoUpdater.allowPrerelease).toBe(true);
+  });
+
+  it('re-checks for updates when release channel changes after configure', async () => {
+    const { configureAutoUpdate, applyAppReleaseChannel } = await loadModule();
+
+    configureAutoUpdate({ releaseChannel: 'stable' });
+    autoUpdater.checkForUpdates.mockClear();
+
+    applyAppReleaseChannel('nightly');
+    expect(autoUpdater.allowPrerelease).toBe(true);
+    expect(autoUpdater.checkForUpdates).toHaveBeenCalledTimes(1);
+
+    autoUpdater.checkForUpdates.mockClear();
+    applyAppReleaseChannel('nightly');
+    expect(autoUpdater.checkForUpdates).not.toHaveBeenCalled();
   });
 
   it('starts disabled when the app is not packaged', async () => {
