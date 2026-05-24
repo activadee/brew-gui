@@ -297,9 +297,13 @@ jobs:
           git commit -m "chore(release): prepare ${{ needs.preflight.outputs.tag }}"
           git push origin HEAD:main
 
+  # Human "build-only" only — Bump and Tag also dispatches with release_type=build-only but sets ref_tag.
   manual-build:
     name: Manual unsigned build
-    if: github.event_name == 'workflow_dispatch' && inputs.release_type == 'build-only'
+    if: |
+      github.event_name == 'workflow_dispatch' &&
+      inputs.release_type == 'build-only' &&
+      inputs.ref_tag == ''
     runs-on: macos-latest
     timeout-minutes: 45
     steps:
